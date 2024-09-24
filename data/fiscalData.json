@@ -1,0 +1,51 @@
+{
+  "dt": "20240418114658",
+  "tag": "",
+  "cashier": "Касир_00",
+  "fiscal": {
+    "task": 1,
+    "receipt": {
+      "sum": 1.34,
+      "round": 0,
+      "comment_up": "Ваші покупки",
+      "comment_down": "Дякуємо за покупку",
+      "rows": [
+        {
+          "code": "0",
+          "code1": 4820249558225,
+          "code_a": "0",
+          "name": "Pizza",
+          "cnt": 9,
+          "price": 0.01,
+          "disc": 0,
+          "cost": 0.09,
+          "taxgrp": 7
+        },
+        {
+          "code": "0",
+          "code1": 4823085629708,
+          "code_a": "0",
+          "name": "Gel before",
+          "cnt": 25,
+          "price": 0.05,
+          "disc": 0,
+          "cost": 1.25,
+          "taxgrp": 7
+        }
+      ],
+      "pays": [
+        {
+          "type": 2,
+          "sum": 1.34,
+          "comment": "Коментар на рядок оплати",
+          "paysys": "MASTERCARD",
+          "rrn": "082523442713",
+          "cardmask": "5375********6736",
+          "term_id": "S1K60G6T",
+          "bank_id": "ПриватБанк",
+          "auth_code": "114758"
+        }
+      ]
+    }
+  }
+}

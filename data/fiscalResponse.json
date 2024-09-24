@@ -1,0 +1,30 @@
+{
+  "task": 1,
+  "type": 1,
+  "ver": 6,
+  "source": "",
+  "device": "9999993744908816",
+  "tag": "d1d4fbe21b6c68576c973d24722c94a1",
+  "dt": "20240418114658",
+  "res": 0,
+  "res_action": 0,
+  "errortxt": "",
+  "warnings": [],
+  "info": {
+    "task": 1,
+    "fisid": "9999993744908816",
+    "dataid": 76,
+    "doccode": "TEST_fqbv4tAXWJylpg",
+    "dt": "20240418114658",
+    "cashier": "",
+    "dtype": 0,
+    "isprint": 0,
+    "isoffline": false,
+    "safe": 0,
+    "shift_link": 5,
+    "docno": 27,
+    "cancelid": "TEST_fqbv4tAXWJylpg",
+    "qr": "https://kasa.vchasno.ua/c/TEST_fqbv4tAXWJylpg?id=TEST_fqbv4tAXWJylpg&date=20240418&time=11:46:58&fn=9999993744908816&sm=1.34&mac=4c4b0f2bfa040006687eec6700c62ea6886a53af0ef870f83328cbbe8a123f6e"
+  },
+  "error_extra": null
+}

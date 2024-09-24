@@ -1,0 +1,36 @@
+[
+  {
+    "id": 4,
+    "product_id": 3,
+    "quantity": 4,
+    "store_id": 11,
+    "Products": {
+      "product_id": 3,
+      "product_name": "Banana - Green",
+      "barcode": "9020765958",
+      "image": "http://dummyimage.com/249x100.png/cc0000/ffffff",
+      "description": "Wine - Vineland Estate Semi - Dry",
+      "price": "18.76",
+      "total": 43,
+      "ProductCategories": [
+        {
+          "product_id": 3,
+          "category_id": 2,
+          "Categories": {
+            "category_id": 2,
+            "category_name": "salad"
+          }
+        },
+        {
+          "product_id": 3,
+          "category_id": 3,
+          "Categories": {
+            "category_id": 3,
+            "category_name": "drink"
+          }
+        }
+      ]
+    },
+    "total": 1
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "method": "ServiceMessage",
+  "step": 0,
+  "params": {
+    "msgType": "deviceBusy"
+  },
+  "error": false,
+  "errorDescription": ""
+}

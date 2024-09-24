@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Categories {
+  category_id       Int                 @id(map: "PK__Categori__D54EE9B4B764335B") @default(autoincrement())
+  category_name     String              @db.NVarChar(255)
+  ProductCategories ProductCategories[]
+}
+
+model Managers {
+  manager_id Int     @id(map: "Managers_PK") @default(autoincrement())
+  name       String? @db.NVarChar(50)
+  login      String  @unique(map: "Managers_UNIQUE") @db.NVarChar(50)
+  password   String? @db.NVarChar(200)
+  token      String? @db.NVarChar(200)
+}
+
+model newOne {
+  id      Int     @id(map: "PK_newOne") @default(autoincrement())
+  name    String? @db.VarChar(50)
+  address String  @db.VarChar(50)
+}
+
+model nextRetail {
+  id        Int     @id @default(autoincrement())
+  user_name String  @db.NVarChar(50)
+  phone     String  @db.NChar(13)
+  email     String  @db.NVarChar(50)
+  city      String? @db.NVarChar(50)
+  message   String  @db.NVarChar(Max)
+  date      String?
+}
+
+model ProductCategories {
+  product_id  Int
+  category_id Int
+  Categories  Categories @relation(fields: [category_id], references: [category_id], onUpdate: NoAction, map: "FK__ProductCa__categ__08B54D69")
+  Products    Products   @relation(fields: [product_id], references: [product_id], onUpdate: NoAction, map: "FK__ProductCa__produ__07C12930")
+
+  @@id([product_id, category_id], map: "PK__ProductC__1A56936ED8E1F28E")
+}
+
+model Products {
+  product_id          Int                 @id(map: "PK_Products") @default(autoincrement())
+  product_name        String?             @db.VarChar(50)
+  barcode             String?             @unique(map: "Products_UNIQUE") @db.VarChar(50)
+  image               String?             @db.VarChar(50)
+  description         String?             @db.VarChar(50)
+  price               Decimal?            @db.Decimal(5, 2)
+  total               Int?
+  products_in_stores  Int?
+  products_out_stores Int?
+  ProductCategories   ProductCategories[]
+  ProductsOnStore     ProductsOnStore[]
+}
+
+model ProductsOnStore {
+  product_id Int
+  quantity   Int?
+  store_id   Int
+  discount   Decimal? @default(0.00, map: "DF__ProductsO__disco__4A8310C6") @db.Decimal(2, 2)
+  Products   Products @relation(fields: [product_id], references: [product_id], onUpdate: NoAction, map: "FK_ProductsOnStore_Products")
+  Stores     Stores   @relation(fields: [store_id], references: [store_id], onUpdate: NoAction, map: "ProductsOnStore_Stores_FK")
+
+  @@unique([store_id, product_id], map: "ProductsOnStore_UNIQUE")
+}
+
+model Stores {
+  store_id        Int               @id(map: "PK_Stores") @unique(map: "IX_ID_Stores") @default(autoincrement())
+  store_name      String?           @db.VarChar(50)
+  location        String?           @db.VarChar(50)
+  auth_id         String            @unique(map: "AK_AuthID") @db.VarChar(50)
+  password        String?           @db.VarChar(200)
+  token           String?           @db.VarChar(200)
+  role            String?           @db.NVarChar(10)
+  isOnline        Boolean?          @default(false, map: "DF__Stores__isOnline__4D5F7D71")
+  PendingFiscals  PendingFiscals[]  @ignore
+  ProductsOnStore ProductsOnStore[]
+}
+
+model sysdiagrams {
+  name         String @db.NVarChar(128)
+  principal_id Int
+  diagram_id   Int    @id(map: "PK__sysdiagr__C2B05B6160A7482C") @default(autoincrement())
+  version      Int?
+  definition   Bytes?
+
+  @@unique([principal_id, name], map: "UK_principal_name")
+}
+
+model osChartsIncome {
+  id            Int      @id @default(autoincrement())
+  income_sum    Decimal  @db.Decimal(18, 2)
+  income_date   DateTime @db.Date
+  income_payer  String?  @db.NVarChar(50)
+  currency      String   @default("N'UAH'", map: "DF_osChartsIncome_currency") @db.NChar(3)
+  income_source String?  @db.NChar(20)
+}
+
+model osChartsOutcome {
+  id               Int      @id @default(autoincrement())
+  outcome_sum      Decimal  @db.Decimal(18, 2)
+  outcome_date     DateTime @db.Date
+  currency         String   @default("N'UAH'", map: "DF_osChartsOutcome_currency") @db.NChar(3)
+  associated_costs Boolean  @default(false, map: "DF_osChartsOutcome_associated_costs")
+}
+
+model osProducts {
+  id               Int      @id @default(autoincrement())
+  product_name     String   @db.NVarChar(50)
+  product_price    Decimal  @db.Decimal(10, 2)
+  product_quantity Decimal  @db.Decimal(18, 2)
+  measure          String?  @db.NChar(10)
+  product_date     DateTime @db.Date
+  product_cost     Decimal? @db.Decimal(29, 4)
+}
+
+model osUsers {
+  userId   Int     @id(map: "PK_osUsers") @default(autoincrement())
+  email    String  @unique(map: "IX_osUsers") @db.NVarChar(50)
+  password String  @db.NVarChar(200)
+  token    String? @db.VarChar(200)
+}
+
+model spendReport {
+  itemId   Int      @id(map: "PK_spendReport") @default(autoincrement())
+  name     String   @db.NVarChar(50)
+  date     DateTime @db.Date
+  quantity Int
+  price    Decimal  @db.Decimal(10, 2)
+  cost     Decimal? @db.Decimal(21, 2)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model PendingFiscals {
+  store_id Int?
+  check    String? @db.NVarChar(1)
+  Stores   Stores? @relation(fields: [store_id], references: [store_id], onDelete: NoAction, onUpdate: NoAction, map: "PendingFiscals_Stores_FK")
+
+  @@ignore
+}

@@ -1,0 +1,30 @@
+{
+  "task": 1,
+  "type": 1,
+  "ver": 6,
+  "source": "",
+  "device": "9999993744908816",
+  "tag": "0a7b7fe663064825c7b3d53955d67200",
+  "dt": "20240417154658",
+  "res": 0,
+  "res_action": 0,
+  "errortxt": "",
+  "warnings": [],
+  "info": {
+    "task": 1,
+    "fisid": "9999993744908816",
+    "dataid": 10,
+    "doccode": "TEST_RlRozsriWXbhNA",
+    "dt": "20240417154658",
+    "cashier": "",
+    "dtype": 0,
+    "isprint": 0,
+    "isoffline": false,
+    "safe": 0,
+    "shift_link": 4,
+    "docno": 2,
+    "cancelid": "TEST_RlRozsriWXbhNA",
+    "qr": "https://kasa.vchasno.ua/c/TEST_RlRozsriWXbhNA?id=TEST_RlRozsriWXbhNA&date=20240417&time=15:46:58&fn=9999993744908816&sm=1.34&mac=921d203dd84ff7ab7dd71e59aa2e63dd1a3cacbdc785fd8813fe0c9b9b30212f"
+  },
+  "error_extra": null
+}
