@@ -1,36 +1,97 @@
 [
   {
-    "id": 4,
-    "product_id": 3,
-    "quantity": 4,
-    "store_id": 11,
-    "Products": {
-      "product_id": 3,
-      "product_name": "Banana - Green",
-      "barcode": "9020765958",
-      "image": "http://dummyimage.com/249x100.png/cc0000/ffffff",
-      "description": "Wine - Vineland Estate Semi - Dry",
-      "price": "18.76",
-      "total": 43,
-      "ProductCategories": [
-        {
-          "product_id": 3,
-          "category_id": 2,
-          "Categories": {
-            "category_id": 2,
-            "category_name": "salad"
-          }
-        },
-        {
-          "product_id": 3,
-          "category_id": 3,
-          "Categories": {
-            "category_id": 3,
-            "category_name": "drink"
-          }
-        }
-      ]
+    "id": 17,
+    "product_name": "Misso Мигдаль смажений, 45г",
+    "product_code": "532",
+    "barcode": "4820146730175",
+    "measure": "шт.",
+    "product_name_ru": null,
+    "product_name_ua": "Misso Мигдаль смажений, 45г",
+    "product_description": null,
+    "good_category": "Горіхи і сухофрукти",
+    "product_category": 1,
+    "product_subcategory": 13,
+    "product_left": "5",
+    "product_image": "img/snacks.webp",
+    "product_price": "135.86",
+    "product_discount": null,
+    "product_rating": null,
+    "product_lot": 1,
+    "exposition_term": 5,
+    "sale_id": 7,
+    "discount_price_1": null,
+    "discount_price_2": null,
+    "discount_price_3": null,
+    "updatedAt": "2024-10-25T15:40:21.943Z",
+    "combo_id": 1,
+    "Categories": {
+      "id": 1,
+      "category_name": "Снеки",
+      "category_discount": null,
+      "category_image": "img/icons/snacks.webp"
     },
-    "total": 1
+    "Subcategories": {
+      "id": 13,
+      "subcategory_name": "Горіхи і сухофрукти",
+      "category_ref": 1,
+      "subcategory_discount": null
+    },
+    "Sales": {
+      "id": 7,
+      "sale_name": "комбо",
+      "sale_discount_1": "0.1",
+      "sale_discount_2": null,
+      "sale_discount_3": null,
+      "sale_description": "Акція для парних товарів",
+      "sale_custom_id": 7
+    },
+    "LoadProducts": [
+      {
+        "load_date": "2024-03-01T00:00:00.000Z"
+      }
+    ],
+    "ComboProducts_Products_combo_idToComboProducts": {
+      "main_product_id": 17,
+      "child_product_id": 35,
+      "combo_id": 1,
+      "isActive": true,
+      "Products_ComboProducts_child_product_idToProducts": {
+        "product_left": "5"
+      }
+    },
+    "inCartQuantity": 1,
+    "priceDecrement": 0,
+    "priceAfterDiscount": "122.27",
+    "hasLowerPrice": false,
+    "dateTime": "2024-10-25 15:58:55:6900"
+  },
+  {
+    "id": 35,
+    "product_name": "Батончик Nuts, 42г",
+    "product_code": "550",
+    "barcode": "8593893745841",
+    "measure": "шт.",
+    "product_name_ru": null,
+    "product_name_ua": "Батончик Nuts, 42г",
+    "product_description": null,
+    "good_category": "Батончики",
+    "product_category": 1,
+    "product_subcategory": 1,
+    "product_left": "5",
+    "product_image": "img/snacks.webp",
+    "product_price": "50.83",
+    "product_discount": null,
+    "product_rating": null,
+    "product_lot": null,
+    "exposition_term": null,
+    "sale_id": 0,
+    "discount_price_1": null,
+    "discount_price_2": null,
+    "discount_price_3": null,
+    "updatedAt": "2024-10-25T14:28:35.183Z",
+    "combo_id": null,
+    "inCartQuantity": 1,
+    "priceAfterDiscount": "45.75",
+    "dateTime": "2024-10-25 15:58:55:6900"
   }
 ]

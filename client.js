@@ -28,11 +28,7 @@ let payTimer = null;
 
 let resolvePurchase = () => {};
 let rejectPurchase = () => {};
-// const setupPurchaseHandlers = (resolve, reject) => {
-//   console.log("invoke setupPurchaseHandlers");
-//   resolvePurchase = resolve;
-//   rejectPurchase = reject;
-// };
+
 const setupPurchaseHandlers = (resolve, reject) => {
   resolvePurchase = (response) => {
     if (cancelRequested) {

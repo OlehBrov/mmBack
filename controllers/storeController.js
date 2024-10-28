@@ -7,190 +7,173 @@ const { httpError } = require("../helpers");
 const { prisma } = require("../config/db/dbConfig");
 
 const dataPath = path.join(__dirname, "..", "data", "faker.json");
-// console.log("index --- js");
-// console.log(dataPath);
-// fs.readFile('./data/test.json').then(data=> console.log(data.toString()))
 
-// const getAllStoreProducts = async (req, res, next) => {
-//   const { store_id } = req.store;
-//   const { page, filter = 0 } = req.query;
-//   const limit = 10;
-//   const skip = (page - 1) * limit;
-//   try {
-//     let productWhereClause = {
-//       store_id: store_id,
-//     };
-
-//     // If filter is provided (filter !== 0), update the where clause to filter by category
-//     if (filter !== 0) {
-//       productWhereClause.Products = {
-//         ProductCategories: {
-//           some: {
-//             category_id: parseInt(filter), // Filter by the provided category_id
-//           },
-//         },
-//       };
-//     }
-//     console.log('Filter:', filter, 'Store ID:', store_id);
-//     const [allProducts, productsCount, distinctCategories] =
-//       await prisma.$transaction([
-//         prisma.ProductsOnStore.findMany({
-//           where: productWhereClause,
-//           skip: skip,
-//           take: limit,
-//           include: {
-//             Products: {
-//               include: {
-//                 ProductCategories: {
-//                   include: { Categories: true },
-//                 },
-//               },
-//             },
-//           },
-//         }),
-//         prisma.ProductsOnStore.count({
-//           where: productWhereClause, // Apply the same filter to count the filtered products
-//         }),
-//         // prisma.products.count(),
-//         prisma.ProductCategories.findMany({
-//           where: {
-//             product_id: {
-//               in: await prisma.ProductsOnStore.findMany({
-//                 where: { store_id: store_id },
-//                 select: { product_id: true }, // Only fetch product IDs for this store
-//               }).then((products) => products.map((p) => p.product_id)),
-//             },
-//           },
-//           select: {
-//             category_id: true,
-//             Categories: true, // Include category details (like category name)
-//           },
-//           distinct: ["category_id"], // Ensure distinct categories
-//         }),
-//       ]);
-//     if (!allProducts.length) {
-//       return res.status(200).json({
-//         message: `No products for store ID ${store_id} `,
-//       });
-//     }
-//     if (allProducts && productsCount) {
-//       console.log("allProducts && productsCount");
-//       return res.status(200).json({
-//         message: `Producs for store ID ${store_id} `,
-//         data: allProducts,
-//         categories: distinctCategories,
-//         qty: productsCount,
-//       });
-//     } else {
-//       console.log("error 01");
-//       return next(httpError(401));
-//     }
-//   } catch (error) {
-//     console.log("error 02", error);
-//     return next(httpError(401));
-//   }
-// };
 const getAllStoreProducts = async (req, res, next) => {
-  const { store_id } = req.store;
-  const { page, filter } = req.query;
-  const limit = 10
+  const { auth_id } = req.store;
+  const { filter, subcategory } = req.query;
 
-  const skip = (parseInt(page) - 1) * limit;
+  // const limit = parseInt(size);
+  // const skip = (parseInt(page) - 1) * limit;
 
-  const categoryFilter = parseInt(filter)
+  const categoryFilter = parseInt(filter);
+  const subcategoryFilter = parseInt(subcategory);
 
   try {
-    // Log the incoming filter and store ID for debugging
-    console.log('categoryFilter:', categoryFilter, 'Store ID:', store_id);
-
-    // Base query to find products in the store
-    let productWhereClause = {
-      store_id: store_id,
+    // Base where clause, ensuring products with quantity greater than 0
+    let whereClause = {
+      product_left: {
+        not: null,
+        gt: 0,
+      },
     };
-console.log('categoryFilter !== 0', categoryFilter !== 0)
-    // If filter is provided (filter !== 0), update the where clause to filter by category
+
+    // Apply category filter if provided
     if (categoryFilter !== 0) {
-      // First, find all product_ids that belong to the given category_id (filter)
-      const productIdsInCategory = await prisma.ProductCategories.findMany({
-        where: {
-          category_id: categoryFilter, // Filter by the provided category_id
-        },
-        select: {
-          product_id: true, // Only select product_id
-        },
-      }).then((result) => result.map((r) => r.product_id)); // Get list of product_ids
-
-      // Log the filtered product IDs for debugging
-     
-
-      // If there are no products in the category, return an empty response
-      if (productIdsInCategory.length === 0) {
-        return res.status(200).json({
-          message: `No products found for category ${filter}`,
-          products: [],
-          totalProducts: 0,
-          categories: [],
-        });
-      }
-
-      // Add the product_id filter to the query
-      productWhereClause.product_id = { in: productIdsInCategory };
+      whereClause.product_category = categoryFilter;
     }
 
-    // Fetch products from the store
-    const allProducts = await prisma.ProductsOnStore.findMany({
-      where: productWhereClause, // Apply the filter condition dynamically
-      skip: skip,
-      take: limit,
+    // Apply subcategory filter if provided and not equal to 0
+    if (subcategoryFilter !== 0) {
+      whereClause.product_subcategory = subcategoryFilter;
+    }
+
+    // Fetch filtered products
+    const filteredProducts = await prisma.Products.findMany({
+      where: whereClause,
+      // skip: skip,
+      // take: limit,
       include: {
-        Products: {
+        Categories: true,
+        Subcategories: true,
+        Sales: true,
+        LoadProducts: {
+          select: { load_date: true },
+        },
+
+        ComboProducts_Products_combo_idToComboProducts: {
           include: {
-            ProductCategories: {
-              include: { Categories: true }, // Fetch related categories
+            Products_ComboProducts_child_product_idToProducts: {
+              select: {
+                product_left: true, // Include only the 'product_left' column for the child product
+              },
             },
           },
         },
       },
     });
 
-    // Count total products with the filter
-    const productsCount = await prisma.ProductsOnStore.count({
-      where: productWhereClause, // Apply the same filter to count the filtered products
+    // Count total filtered products
+    const productsCount = await prisma.Products.count({
+      where: whereClause,
     });
 
-    // Fetch distinct categories for the products
-    const distinctCategories = await prisma.ProductCategories.findMany({
-      where: {
-        product_id: {
-          in: allProducts.map((p) => p.product_id),
-        },
-      },
+    // Fetch distinct subcategories for the selected category (or all categories if none specified)
+    const distinctSubcategories = await prisma.Products.findMany({
+      where: whereClause,
       select: {
-        category_id: true,
-        Categories: true, // Include category details like category_name
+        product_subcategory: true,
+        Subcategories: true, // Include subcategory details
       },
-      distinct: ['category_id'], // Ensure distinct categories
+      distinct: ["product_subcategory"], // Ensure distinct subcategories
     });
 
-    // If no products found
-    if (!allProducts.length) {
-      return res.status(200).json({
-        message: `No products for store ID ${store_id}`,
+    let distinctCategories = [];
+
+    // Fetch distinct categories only if subcategory === 0
+    if (subcategoryFilter === 0) {
+      distinctCategories = await prisma.Products.findMany({
+        where: {
+          product_left: {
+            not: null,
+            gt: 0,
+          },
+          product_category: categoryFilter !== 0 ? categoryFilter : undefined, // Optionally apply category filter
+        },
+        select: {
+          product_category: true,
+          Categories: true, // Include category details like category_name
+        },
+        distinct: ["product_category"], // Ensure distinct categories
       });
     }
 
-    // Return response
-    res.status(200).json({
-      products: allProducts,
+    // If no products found, return a message
+    if (!filteredProducts.length) {
+      return res.status(200).json({
+        message: `No products found for the provided filters.`,
+      });
+    }
+
+    // Return the filtered products, total count, and distinct subcategories and categories
+    return res.status(200).json({
+      products: filteredProducts,
       totalProducts: productsCount,
-      categories: distinctCategories,
+      subcategories: distinctSubcategories,
+      categories: categoryFilter !== 0 ? [] : distinctCategories, // Return distinct categories if subcategory === 0
     });
   } catch (error) {
-    console.error('Error fetching store products:', error);
+    console.error("Error fetching store products:", error);
     next(error);
   }
 };
 
+const getProductById = async (req, res, next) => {
+  const { comboId } = req.query;
+
+  const normalizedComboId = parseInt(comboId);
+  const comboProduct = await prisma.ComboProducts.findUnique({
+    where: {
+      combo_id: normalizedComboId,
+    },
+    include: {
+      Products_ComboProducts_child_product_idToProducts: true,
+    },
+  });
+
+  console.log("getProductById", comboProduct);
+
+  if (!comboProduct) {
+    return res.status(200).json({
+      message: "No child product found",
+    });
+  }
+
+  return res.status(200).json({
+    childProduct:
+      comboProduct.Products_ComboProducts_child_product_idToProducts, // Access child product relation
+  });
+};
+
+const searchProducts = async (req, res, next) => {
+  const { auth_id } = req.store;
+  const { searchQuery } = req.query;
+  console.log("searchQuery", searchQuery);
+  if (searchQuery.length < 3) {
+    console.log("short request");
+    return null;
+  }
+  const searchResults = await prisma.Products.findMany({
+    where: {
+      AND: [
+        {
+          product_name: {
+            contains: searchQuery,
+          },
+        },
+        {
+          product_left: {
+            not: null,
+            gt: 0,
+          },
+        },
+      ],
+    },
+  });
+  res.status(200).json({
+    searchResults,
+  });
+  console.log("searchResults", searchResults);
+};
 
 async function updateProductQuantities() {
   const products = await Product.find();
@@ -232,4 +215,6 @@ module.exports = {
   readFileData: ctrlWrapper(readFileData),
   updateFileData: ctrlWrapper(updateFileData),
   getAllStoreProducts: ctrlWrapper(getAllStoreProducts),
+  searchProducts: ctrlWrapper(searchProducts),
+  getProductById: ctrlWrapper(getProductById),
 };

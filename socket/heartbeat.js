@@ -47,14 +47,14 @@ wsServer.on("connection", (socket) => {
 
 // Update store status in the database
 async function markStoreAsOnline(id) {
-  await prisma.Stores.update({
+  await prisma.Store.update({
     where: { auth_id: id },
     data: { isOnline: true },
   });
 }
 
 async function markStoreAsOffline(id) {
-  await prisma.Stores.update({
+  await prisma.Store.update({
     where: { auth_id: id },
     data: { isOnline: false },
   });

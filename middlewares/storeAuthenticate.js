@@ -18,8 +18,8 @@ console.log('storeAuthenticate token', token)
   }
   try {
     const { auth_id } = jwt.verify(token, AUTH_TOKEN_SECRET_KEY);
- 
-    const prismaStore = await prisma.stores.findUnique({
+    console.log('auth_id', auth_id)
+    const prismaStore = await prisma.Store.findUnique({
       where: {
         auth_id: auth_id,
       },

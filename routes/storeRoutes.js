@@ -1,10 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const productsController = require('../controllers/storeController');
+const productsController = require("../controllers/storeController");
 const storeAuthenticate = require("../middlewares/storeAuthenticate");
 
+router.get("/", storeAuthenticate, productsController.getAllStoreProducts);
 
-router.get("/", storeAuthenticate, productsController.getAllStoreProducts)
-router.get('/:filter')
+router.get("/search", storeAuthenticate, productsController.searchProducts);
+router.get(
+  "/product",
+  storeAuthenticate,
+  productsController.getProductById
+);
 
 module.exports = router;

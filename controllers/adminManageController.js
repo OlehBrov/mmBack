@@ -352,7 +352,7 @@ const putProductsInStore = async (req, res, next) => {
 
 const createStore = async (req, res, next) => {
   const { name, location, auth_id, password } = req.body;
-  const store = await prisma.stores.findUnique({
+  const store = await prisma.Store.findUnique({
     where: {
       auth_id: auth_id,
     },
@@ -367,7 +367,7 @@ const createStore = async (req, res, next) => {
   }
   const hashPassword = await bcrypt.hash(password, 10);
   try {
-    const newStore = await prisma.stores.create({
+    const newStore = await prisma.Store.create({
       data: {
         store_name: name,
         location: location,
@@ -382,7 +382,7 @@ const createStore = async (req, res, next) => {
     const { store_id } = newStore;
     const payload = { store_id: newStore.store_id };
     const token = jwt.sign(payload, AUTH_TOKEN_SECRET_KEY, { expiresIn: "23h" });
-    await prisma.stores.update({
+    await prisma.Store.update({
       where: {
         store_id: store_id,
       },

@@ -8,140 +8,143 @@ datasource db {
 }
 
 model Categories {
-  category_id       Int                 @id(map: "PK__Categori__D54EE9B4B764335B") @default(autoincrement())
-  category_name     String              @db.NVarChar(255)
-  ProductCategories ProductCategories[]
-}
-
-model Managers {
-  manager_id Int     @id(map: "Managers_PK") @default(autoincrement())
-  name       String? @db.NVarChar(50)
-  login      String  @unique(map: "Managers_UNIQUE") @db.NVarChar(50)
-  password   String? @db.NVarChar(200)
-  token      String? @db.NVarChar(200)
-}
-
-model newOne {
-  id      Int     @id(map: "PK_newOne") @default(autoincrement())
-  name    String? @db.VarChar(50)
-  address String  @db.VarChar(50)
-}
-
-model nextRetail {
-  id        Int     @id @default(autoincrement())
-  user_name String  @db.NVarChar(50)
-  phone     String  @db.NChar(13)
-  email     String  @db.NVarChar(50)
-  city      String? @db.NVarChar(50)
-  message   String  @db.NVarChar(Max)
-  date      String?
-}
-
-model ProductCategories {
-  product_id  Int
-  category_id Int
-  Categories  Categories @relation(fields: [category_id], references: [category_id], onUpdate: NoAction, map: "FK__ProductCa__categ__08B54D69")
-  Products    Products   @relation(fields: [product_id], references: [product_id], onUpdate: NoAction, map: "FK__ProductCa__produ__07C12930")
-
-  @@id([product_id, category_id], map: "PK__ProductC__1A56936ED8E1F28E")
+  id                Int             @id(map: "Categories_PK") @default(autoincrement())
+  category_name     String          @db.VarChar(25)
+  category_discount Decimal?        @db.Decimal(10, 2)
+  category_image    String?         @db.VarChar(100)
+  Products          Products[]
+  Subcategories     Subcategories[]
 }
 
 model Products {
-  product_id          Int                 @id(map: "PK_Products") @default(autoincrement())
-  product_name        String?             @db.VarChar(50)
-  barcode             String?             @unique(map: "Products_UNIQUE") @db.VarChar(50)
-  image               String?             @db.VarChar(50)
-  description         String?             @db.VarChar(50)
-  price               Decimal?            @db.Decimal(5, 2)
-  total               Int?
-  products_in_stores  Int?
-  products_out_stores Int?
-  ProductCategories   ProductCategories[]
-  ProductsOnStore     ProductsOnStore[]
+  id                                                     Int              @id(map: "Products_PK") @default(autoincrement())
+  product_name                                           String?          @db.VarChar(256)
+  product_code                                           String?          @db.VarChar(256)
+  barcode                                                String?          @unique(map: "Products_UNIQUE") @db.VarChar(256)
+  measure                                                String?          @db.VarChar(64)
+  product_name_ru                                        String?          @db.VarChar(256)
+  product_name_ua                                        String?          @db.VarChar(256)
+  product_description                                    String?          @db.VarChar(256)
+  good_category                                          String?          @db.VarChar(256)
+  product_category                                       Int?
+  product_subcategory                                    Int?
+  product_left                                           Decimal?         @default(0, map: "DF__Products__produc__65F62111") @db.Decimal(10, 2)
+  product_image                                          String?          @db.VarChar(255)
+  product_price                                          Decimal?         @db.Decimal(10, 2)
+  product_discount                                       Decimal?         @db.Decimal(10, 2)
+  product_rating                                         Decimal?         @db.Decimal(10, 2)
+  product_lot                                            Int?
+  exposition_term                                        Int?
+  sale_id                                                Int?
+  discount_price_1                                       Decimal?         @db.Decimal(10, 2)
+  discount_price_2                                       Decimal?         @db.Decimal(10, 2)
+  discount_price_3                                       Decimal?         @db.Decimal(10, 2)
+  updatedAt                                              DateTime?        @db.DateTime
+  combo_id                                               Int?
+  ComboProducts_ComboProducts_main_product_idToProducts  ComboProducts[]  @relation("ComboProducts_main_product_idToProducts")
+  ComboProducts_ComboProducts_child_product_idToProducts ComboProducts[]  @relation("ComboProducts_child_product_idToProducts")
+  Inventory                                              Inventory?
+  LoadProducts                                           LoadProducts[]
+  Categories                                             Categories?      @relation(fields: [product_category], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Categories_FK")
+  ComboProducts_Products_combo_idToComboProducts         ComboProducts?   @relation("Products_combo_idToComboProducts", fields: [combo_id], references: [combo_id], onUpdate: NoAction, map: "Products_ComboProducts_FK")
+  LoadProducts_Products_product_lotToLoadProducts        LoadProducts?    @relation("Products_product_lotToLoadProducts", fields: [product_lot], references: [id], onUpdate: NoAction, map: "Products_LoadProducts_FK")
+  Sales                                                  Sales?           @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Sales_FK")
+  Subcategories                                          Subcategories?   @relation(fields: [product_subcategory], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Subcategories_FK")
+  RemoveProducts                                         RemoveProducts[]
+  Transactions                                           Transactions[]
 }
 
-model ProductsOnStore {
-  product_id Int
-  quantity   Int?
-  store_id   Int
-  discount   Decimal? @default(0.00, map: "DF__ProductsO__disco__4A8310C6") @db.Decimal(2, 2)
-  Products   Products @relation(fields: [product_id], references: [product_id], onUpdate: NoAction, map: "FK_ProductsOnStore_Products")
-  Stores     Stores   @relation(fields: [store_id], references: [store_id], onUpdate: NoAction, map: "ProductsOnStore_Stores_FK")
+model LoadProducts {
+  id                                          Int              @id(map: "LoadProducts_PK") @default(autoincrement())
+  product_id                                  Int?
+  load_date                                   DateTime?        @db.Date
+  load_quantity                               Decimal?         @db.Decimal(10, 2)
+  lotIsActive                                 Boolean?         @default(false, map: "DF__LoadProdu__lotIs__7F80E8EA")
+  products_left                               Decimal?         @db.Decimal(10, 2)
+  sale_id                                     Int?             @default(0, map: "DF__LoadProdu__sale___76818E95")
+  child_product_barcode                       String?          @db.VarChar(256)
+  Products                                    Products?        @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "LoadProducts_Products_FK")
+  Sales                                       Sales?           @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "LoadProducts_Sales_FK")
+  Products_Products_product_lotToLoadProducts Products[]       @relation("Products_product_lotToLoadProducts")
+  RemoveProducts                              RemoveProducts[]
 
-  @@unique([store_id, product_id], map: "ProductsOnStore_UNIQUE")
+  @@unique([product_id, lotIsActive], map: "LoadProducts_UNIQUE_1")
 }
 
-model Stores {
-  store_id        Int               @id(map: "PK_Stores") @unique(map: "IX_ID_Stores") @default(autoincrement())
-  store_name      String?           @db.VarChar(50)
-  location        String?           @db.VarChar(50)
-  auth_id         String            @unique(map: "AK_AuthID") @db.VarChar(50)
-  password        String?           @db.VarChar(200)
-  token           String?           @db.VarChar(200)
-  role            String?           @db.NVarChar(10)
-  isOnline        Boolean?          @default(false, map: "DF__Stores__isOnline__4D5F7D71")
-  PendingFiscals  PendingFiscals[]  @ignore
-  ProductsOnStore ProductsOnStore[]
+model RemoveProducts {
+  id              Int           @id(map: "RemoveProducts_PK") @default(autoincrement())
+  product_id      Int?
+  remove_date     DateTime?     @db.DateTime
+  remove_quantity Decimal?      @db.Decimal(10, 2)
+  remove_type_id  Int?
+  remove_cost     Decimal?      @db.Decimal(10, 2)
+  isActive        Boolean?      @default(false, map: "DF__RemovePro__isAct__0E04126B")
+  load_id         Int?
+  LoadProducts    LoadProducts? @relation(fields: [load_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_LoadProducts_FK")
+  Products        Products?     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_Products_FK")
+  RemoveTypes     RemoveTypes?  @relation(fields: [remove_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_RemoveTypes_FK")
 }
 
-model sysdiagrams {
-  name         String @db.NVarChar(128)
-  principal_id Int
-  diagram_id   Int    @id(map: "PK__sysdiagr__C2B05B6160A7482C") @default(autoincrement())
-  version      Int?
-  definition   Bytes?
-
-  @@unique([principal_id, name], map: "UK_principal_name")
+model RemoveTypes {
+  id             Int              @id(map: "RemoveTypes_PK") @default(autoincrement())
+  type_name      String?          @db.VarChar(20)
+  type_name_ua   String?          @db.VarChar(20)
+  RemoveProducts RemoveProducts[]
 }
 
-model osChartsIncome {
-  id            Int      @id @default(autoincrement())
-  income_sum    Decimal  @db.Decimal(18, 2)
-  income_date   DateTime @db.Date
-  income_payer  String?  @db.NVarChar(50)
-  currency      String   @default("N'UAH'", map: "DF_osChartsIncome_currency") @db.NChar(3)
-  income_source String?  @db.NChar(20)
+model Subcategories {
+  id                   Int        @id(map: "Subcategories_PK") @default(autoincrement())
+  subcategory_name     String?    @db.VarChar(100)
+  category_ref         Int
+  subcategory_discount Decimal?   @db.Decimal(10, 2)
+  Products             Products[]
+  Categories           Categories @relation(fields: [category_ref], references: [id], onUpdate: NoAction, map: "Subcategories_Categories_FK")
 }
 
-model osChartsOutcome {
-  id               Int      @id @default(autoincrement())
-  outcome_sum      Decimal  @db.Decimal(18, 2)
-  outcome_date     DateTime @db.Date
-  currency         String   @default("N'UAH'", map: "DF_osChartsOutcome_currency") @db.NChar(3)
-  associated_costs Boolean  @default(false, map: "DF_osChartsOutcome_associated_costs")
+model Store {
+  id         Int     @id(map: "Store_PK") @default(autoincrement())
+  auth_id    String  @unique(map: "Store_UNIQUE") @db.VarChar(50)
+  store_name String? @db.VarChar(100)
+  password   String? @db.VarChar(200)
+  token      String? @db.VarChar(200)
+  role       String? @db.VarChar(100)
 }
 
-model osProducts {
-  id               Int      @id @default(autoincrement())
-  product_name     String   @db.NVarChar(50)
-  product_price    Decimal  @db.Decimal(10, 2)
-  product_quantity Decimal  @db.Decimal(18, 2)
-  measure          String?  @db.NChar(10)
-  product_date     DateTime @db.Date
-  product_cost     Decimal? @db.Decimal(29, 4)
+model Inventory {
+  product_id      Int      @unique(map: "Inventory_UNIQUE")
+  total_quantity  Decimal? @db.Decimal(10, 2)
+  product_sale_id Int?
+  Products        Products @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "Inventory_Products_FK")
 }
 
-model osUsers {
-  userId   Int     @id(map: "PK_osUsers") @default(autoincrement())
-  email    String  @unique(map: "IX_osUsers") @db.NVarChar(50)
-  password String  @db.NVarChar(200)
-  token    String? @db.VarChar(200)
+model Transactions {
+  id              Int       @id(map: "Transactions_PK") @default(autoincrement())
+  upload_date     DateTime? @db.Date
+  product_id      Int?
+  upload_quantity Decimal?  @db.Decimal(10, 2)
+  left_quantity   Decimal?  @db.Decimal(10, 2)
+  isActiveLot     Boolean?  @default(false, map: "DF__Transacti__isAct__4EA8A765")
+  Products        Products? @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Transactions_Products_FK")
 }
 
-model spendReport {
-  itemId   Int      @id(map: "PK_spendReport") @default(autoincrement())
-  name     String   @db.NVarChar(50)
-  date     DateTime @db.Date
-  quantity Int
-  price    Decimal  @db.Decimal(10, 2)
-  cost     Decimal? @db.Decimal(21, 2)
+model ComboProducts {
+  main_product_id                                   Int
+  child_product_id                                  Int
+  combo_id                                          Int        @id(map: "ComboProducts_PK") @default(autoincrement())
+  isActive                                          Boolean?   @default(false, map: "DF__ComboProd__isAct__13DCE752")
+  Products_ComboProducts_main_product_idToProducts  Products   @relation("ComboProducts_main_product_idToProducts", fields: [main_product_id], references: [id], onUpdate: NoAction, map: "ComboProducts_Products_FK")
+  Products_ComboProducts_child_product_idToProducts Products   @relation("ComboProducts_child_product_idToProducts", fields: [child_product_id], references: [id], onUpdate: NoAction, map: "ComboProducts_Products_FK_1")
+  Products_Products_combo_idToComboProducts         Products[] @relation("Products_combo_idToComboProducts")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model PendingFiscals {
-  store_id Int?
-  check    String? @db.NVarChar(1)
-  Stores   Stores? @relation(fields: [store_id], references: [store_id], onDelete: NoAction, onUpdate: NoAction, map: "PendingFiscals_Stores_FK")
-
-  @@ignore
+model Sales {
+  id               Int            @id(map: "Sales_PK") @default(autoincrement())
+  sale_name        String         @db.NVarChar(128)
+  sale_discount_1  Decimal?       @db.Decimal(2, 2)
+  sale_discount_2  Decimal?       @db.Decimal(2, 2)
+  sale_discount_3  Decimal?       @db.Decimal(2, 2)
+  sale_description String?        @db.NVarChar(256)
+  sale_custom_id   Int?           @unique(map: "Sales_UNIQUE")
+  LoadProducts     LoadProducts[]
+  Products         Products[]
 }

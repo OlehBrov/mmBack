@@ -38,11 +38,13 @@ const saleCheck = async (body) => {
       try {
         const response = await apiInstance.post("", body);
         console.log("saleCheck response", response.data);
+
         if (response.data.res !== 0) {
           const buffer = await initBuffer();
           buffer.push(body);
           await saveBuffer(buffer);
           console.log("response.data.res !== 0");
+          return response.data
         }
         console.log("response after if in saleCheck");
         return response.data;
@@ -64,13 +66,14 @@ const saleCheck = async (body) => {
         } else {
           console.error("Error Message:", error.message);
         }
+        console.log('salecheck error', error)
         return null; // Returning null to indicate failure
       }
     }
   } finally {
     bufferAccess = false; // Reset access when done
     buffer = await initBuffer();
-    
+
     if (buffer.length > 0) {
       // Check if new items were added during the operation
       startRetryProcess(); // Optionally, trigger retries immediately if needed
@@ -81,7 +84,7 @@ let retryInterval;
 
 const startRetryProcess = () => {
   if (!retryInterval) {
-    console.log('startRetryProcess')
+    console.log("startRetryProcess");
     retryInterval = setInterval(retryFailedRequests, 10000); // Retry every 10 seconds
   }
 };

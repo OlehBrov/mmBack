@@ -4,6 +4,8 @@ const {
   ctrlWrapper,
   recipeReqCreator,
   preparePurchase,
+  withResolvers,
+  purchaseDbHandler,
 } = require("../helpers");
 const { json } = require("express");
 
@@ -12,19 +14,46 @@ const fiscalDataPath = path.join(__dirname, "..", "data", "fiscalData.json");
 const { writer, setupPurchaseHandlers, interruptMsg } = require("../client");
 const saleCheck = require("../api/fisclalApi");
 const fakePurchaseProducts = require("../data/recipeRCpurchase.json");
-const fakeBankResponse = require("../data/RCtransactionData.json");
+const fakeBankResponse = require("../data/fakeTerminalResponse.json");
 
 let cancelRequested = require("../client");
 
 const { eventEmitter } = require("../client");
 
 const Promise = require("bluebird");
+
 Promise.config({
   cancellation: true,
 });
 
+const createFakeTerminalResponce = (purchData) => {
+  const dateObj = new Date();
+  const date = dateObj.getDate().toString().padStart(2, "0");
+  const month = dateObj.getMonth();
+  const corMonth = String(month + 1).padStart(2, "0");
+  const year = dateObj.getFullYear();
+  const hours = dateObj.getHours().toString().padStart(2, "0");
+  const minutes = dateObj.getMinutes().toString().padStart(2, "0");
+  const seconds = dateObj.getSeconds().toString().padStart(2, "0");
+
+  const resp = {
+    ...fakeBankResponse,
+    params: {
+      ...fakeBankResponse.params, // Spread the existing `params` object
+      amount: purchData.params.amount,
+      date: `${date}.${corMonth}.${year}`,
+      time: `${hours}:${minutes}:${seconds}`,
+    },
+    error: false,
+    errorDescription: "",
+  };
+
+  return resp;
+};
+
 const productsSell = async (req, res) => {
-  if (!req.body || !req.body.length) {
+  console.log()
+  if (!req.body || !req.body.cartProducts.length) {
     return res.status(400).json({
       message: "Failed to process the purchase",
       description: "No products to buy",
@@ -32,7 +61,7 @@ const productsSell = async (req, res) => {
   }
 
   const purchaseProducts = req.body;
-  console.log('purchaseProducts', purchaseProducts)
+  console.log("purchaseProducts", purchaseProducts);
   const purchase = preparePurchase(purchaseProducts);
 
   if (!purchase) {
@@ -42,50 +71,53 @@ const productsSell = async (req, res) => {
     });
   }
   console.log("purchase 1", purchase);
-  const transactionPromise = new Promise((resolve, reject, onCancel) => {
-    setupPurchaseHandlers(resolve, reject);
-    writer(purchase).catch(reject);
-
-    onCancel(() => {
-      reject({
-        error: true,
-        errorDescription: "Purchase cancelled by user",
-      });
-      // Perform any necessary cleanup here
-      return res.status(200).json({
-        message: "Покупка скасовав",
-      });
-    });
-  });
+  /*
+to terminal
+  const {
+    promise: transactionPromise,
+    resolve,
+    reject,
+    cancel,
+  } = withResolvers();
+  setupPurchaseHandlers(resolve, reject);
+  writer(purchase).catch(reject);
 
   eventEmitter.on("cancelPurchase", () => {
     console.log("Cancellation success requested");
-    transactionPromise.cancel();
-  });
-
-  try {
-    const response = await transactionPromise;
-    console.log("Transaction completed:", response);
-
-    if (response.error) {
-      return res.status(400).json({
-        message: "Failed to process the purchase",
-        description: response.errorDescription,
-      });
-    }
-
-    const fiscalData = await recipeReqCreator(purchaseProducts, response);
-    const fiscalResponse = await saleCheck(fiscalData);
-    setTimeout(() => {
-      res.status(200).send(fiscalResponse);
-    }, 5000);
-  } catch (error) {
-    console.log("Transaction error:", error);
-    res.status(400).json({
-      message: "Failed to process the purchase",
-      description: error.message || "Unknown error",
+    cancel({
+      error: true,
+      errorDescription: "Purchase cancelled by user",
     });
+    
+  });
+ */
+
+  const response = createFakeTerminalResponce(purchase);
+  
+  //REAL transaction
+  // const response = await transactionPromise;
+
+  console.log("Transaction completed:", response);
+  if (response.error) {
+    // throw new Error(response.errorDescription);
+    return res.status(403).json({errorDescription:response.errorDescription})
+
   }
+  if (!response.error && response.method === "Purchase") {
+  purchaseDbHandler(purchaseProducts, response)
+}
+  const fiscalData = await recipeReqCreator(purchaseProducts, response);
+  const fiscalResponse = await saleCheck(fiscalData);
+
+  res.status(200).send(fiscalResponse);
+
+  // } catch (error) {
+  //   console.log("Transaction error:", error);
+  //   res.status(400).json({
+  //     message: "Failed to process the purchase",
+  //     description: error.message || "Unknown error",
+  //   });
+  // }
 };
 
 // const productsSell = async (req, res) => {
@@ -189,7 +221,6 @@ const cancelSell = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   productsSell: ctrlWrapper(productsSell),
