@@ -67,8 +67,6 @@ model LoadProducts {
   Sales                                       Sales?           @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "LoadProducts_Sales_FK")
   Products_Products_product_lotToLoadProducts Products[]       @relation("Products_product_lotToLoadProducts")
   RemoveProducts                              RemoveProducts[]
-
-  @@unique([product_id, lotIsActive], map: "LoadProducts_UNIQUE_1")
 }
 
 model RemoveProducts {
