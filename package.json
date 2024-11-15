@@ -6,13 +6,13 @@
   "scripts": {
     "test": "jest",
     "start": "cross-env NODE_ENV=production node server.js",
-    "start:dev": "cross-env NODE_ENV=development nodemon server.js"
+    "dev": "cross-env NODE_ENV=development nodemon server.js"
   },
   "keywords": [],
   "author": "SOD",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.17.0",
+    "@prisma/client": "^5.21.1",
     "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
     "bluebird": "^3.7.2",
@@ -37,6 +37,6 @@
   },
   "devDependencies": {
     "faker": "^5.5.3",
-    "prisma": "^5.17.0"
+    "prisma": "^5.21.1"
   }
 }

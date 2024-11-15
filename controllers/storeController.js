@@ -48,7 +48,7 @@ const getAllStoreProducts = async (req, res, next) => {
         Categories: true,
         Subcategories: true,
         Sales: true,
-        LoadProducts: {
+        LoadProducts_LoadProducts_product_idToProducts: {
           select: { load_date: true },
         },
 
@@ -132,8 +132,6 @@ const getProductById = async (req, res, next) => {
     },
   });
 
-  console.log("getProductById", comboProduct);
-
   if (!comboProduct) {
     return res.status(200).json({
       message: "No child product found",
@@ -145,7 +143,25 @@ const getProductById = async (req, res, next) => {
       comboProduct.Products_ComboProducts_child_product_idToProducts, // Access child product relation
   });
 };
+const getSingleProduct = async (req, res, next) => {
+  const { barcode } = req.query;
+  console.log("req.query", req.query);
+  console.log("barcode", barcode);
+  const product = await prisma.Products.findUnique({
+    where: {
+      barcode,
+    },
+  });
 
+  if (!product) {
+    return res.status(200).json({
+      message: "No such product found",
+    });
+  }
+  return res.status(200).json({
+    product,
+  });
+};
 const searchProducts = async (req, res, next) => {
   const { auth_id } = req.store;
   const { searchQuery } = req.query;
@@ -177,217 +193,10 @@ const searchProducts = async (req, res, next) => {
   console.log("searchResults", searchResults);
 };
 
-// const addProducts = async (req, res, next) => {
-//   // const { manager } = req;
-//   // if (!manager) return next(httpError(401));
-//   const formattedDate = moment().toISOString(true);
-//   const products = req.body;
-
-//   try {
-//     const existingProducts = await prisma.products.findMany({
-//       where: {
-//         barcode: { in: products.map((p) => p.barcode) },
-//       },
-//     });
-
-//     const existingBarcodes = new Set(existingProducts.map((p) => p.barcode));
-//     const productsToUpdate = [];
-//     const productsToCreate = [];
-
-//     products.forEach((product) => {
-//       if (existingBarcodes.has(product.barcode)) {
-//         productsToUpdate.push(product);
-//       } else {
-//         productsToCreate.push(product);
-//       }
-//     });
-//     //Add data about withdraw in RemoveProducts, update LoadProducts to make lot inactive and left products 0
-//     const withdrawPromices = productsToUpdate.map(async (product) => {
-//       const withdrawProduct = await prisma.products.findUnique({
-//         where: {
-//           barcode: product.barcode,
-//         },
-//       });
-
-//       if (withdrawProduct.products_left > 0) {
-//         await prisma.RemoveProducts.create({
-//           data: {
-//             product_id: withdrawProduct.id,
-//             remove_date: formattedDate,
-//             remove_quantity: withdrawProduct.product_left,
-//             remove_type_id: 3,
-//             isActive: 0,
-//             load_id: withdrawProduct.product_lot || "",
-//           },
-//         });
-
-//         await prisma.LoadProducts.update({
-//           where: {
-//             id: withdrawProduct.product_lot,
-//           },
-//           data: {
-//             lotIsActive: false,
-//             products_left: 0,
-//           },
-//         });
-//       }
-//     });
-
-//     await Promise.all([...withdrawPromices]);
-
-//     //Create not existing products
-//     const createPromises = productsToCreate.map((product) =>
-//       prisma.products.create({
-//         data: {
-//           product_name: product.product_name,
-//           barcode: product.barcode,
-//           measure: product.measure,
-//           product_name_ua: product.product_name_ua,
-//           product_category: product.product_category,
-//           product_subcategory: product.product_subcategory,
-//           product_left: product.product_left,
-//           image: product.image,
-//           product_description: product.product_description || "",
-//           exposition_term: product.exposition_term || "",
-//           sale_id: product.sale_id || 0,
-//           price: product.price,
-//         },
-//       })
-//     );
-
-//     await Promise.all([...createPromises]);
-
-//     //Update data about existing products
-//     const updatePromices = productsToUpdate.map((product) => {
-//       prisma.products.update({
-//         where: { barcode: product.barcode },
-//         data: {
-//           product_name: product.product_name,
-
-//           measure: product.measure,
-//           product_name_ua: product.product_name_ua,
-//           product_category: product.product_category,
-//           product_subcategory: product.product_subcategory,
-
-//           image: product.image,
-//           description: product.description || "",
-//           exposition_term: product.exposition_term || "",
-//           sale_id: product.sale_id || 0,
-//           price: product.price,
-//         },
-//       });
-//     });
-//     await Promise.all([...updatePromices]);
-
-//     //Update data about loading new products and quantity
-//     const updateLoadData = products.map(async (product) => {
-//       const updateProduct = await prisma.products.findUnique({
-//         where: {
-//           barcode: product.barcode,
-//         },
-//       });
-//       await prisma.LoadProducts.create({
-//         data: {
-//           product_id: updateProduct.id,
-//           load_date: formattedDate,
-//           load_quantity: product.load_quantity,
-//           lotIsActive: true,
-//           products_left: product.load_quantity,
-//           sale_id: product.sale_id || 0,
-//           child_product_barcode: product.child_product_barcode || null,
-//         },
-//       });
-//       if (product.sale_id !== 0) {
-//         const childProduct = await prisma.products.findUnique({
-//           where: {
-//             barcode: product.child_product_barcode,
-//           },
-//         });
-
-//         await prisma.ComboProducts.update({
-//           where: {
-//             AND: [
-//               {
-//                 main_product_id: {
-//                   equals: updateProduct.id,
-//                 },
-//               },
-//               {
-//                 isActive: {
-//                   equals: 1,
-//                 },
-//               },
-//             ],
-//           },
-//           data: {
-//             isActive: 0,
-//           },
-//         });
-
-//         await prisma.ComboProducts.create({
-//           data: {
-//             main_product_id: updateProduct.id,
-//             child_product_id: childProduct.id,
-//             isActive: 1,
-//           },
-//         });
-//       }
-//     });
-//     await Promise.all([...updateLoadData]);
-
-//     //Final product update with lot_id
-//     const finalUpdate = products.map(async (product) => {
-//       const finalProduct = await prisma.products.findUnique({
-//         where: {
-//           barcode: product.barcode,
-//         },
-//       });
-
-//       const loadData = await prisma.LoadProducts.findUnique({
-//         where: {
-//           AND: [
-//             {
-//               product_id: {
-//                 equals: finalProduct.id,
-//               },
-//             },
-//             {
-//               lotIsActive: {
-//                 equals: true,
-//               },
-//             },
-//           ],
-//         },
-//       });
-
-//       await prisma.products.update({
-//         where: {
-//           id: finalProduct,
-//         },
-//         data: {
-//           product_lot: loadData.id,
-//         },
-//       });
-//     });
-//     await Promise.all([...finalUpdate]);
-//     res.json({
-//       message: "Products processed successfully",
-//       existing: {
-//         message: `Found ${productsToUpdate.length} already existing products, not added`,
-//         data: productsToUpdate,
-//       },
-//       created: {
-//         message: `Added ${productsToCreate.length} products`,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error processing products:", error);
-//     next(httpError(500, "An error occurred while processing products"));
-//   }
-// };
 const addProducts = async (req, res, next) => {
   const formattedDate = moment().toISOString(true);
-  const products = req.body;
+
+  const { validProducts: products, invalidProducts, abNormalProducts } = req;
 
   try {
     const existingProducts = await prisma.products.findMany({
@@ -402,152 +211,279 @@ const addProducts = async (req, res, next) => {
       (product) => !existingBarcodes.has(product.barcode)
     );
 
-    // Withdraw existing products
-    await Promise.all(
-      productsToUpdate.map(async (product) => {
-        const withdrawProduct = await prisma.products.findUnique({
+    await prisma.$transaction(async (tx) => {
+      for (const product of productsToUpdate) {
+        const withdrawProduct = await tx.products.findUnique({
           where: { barcode: product.barcode },
         });
 
-        if (withdrawProduct.product_left > 0) {
-          await prisma.$transaction([
-            prisma.RemoveProducts.create({
-              data: {
-                product_id: withdrawProduct.id,
-                remove_date: formattedDate,
-                remove_quantity: withdrawProduct.product_left,
-                remove_type_id: 3,
-                isActive: false,
-                load_id: withdrawProduct.product_lot || "",
-              },
-            }),
-            prisma.LoadProducts.update({
+        if (withdrawProduct && withdrawProduct.product_left > 0) {
+          await tx.RemoveProducts.create({
+            data: {
+              product_id: withdrawProduct.id,
+              remove_date: formattedDate,
+              remove_quantity: withdrawProduct.product_left,
+              remove_type_id: 3,
+              isActive: false,
+              load_id: withdrawProduct.product_lot || "",
+            },
+          });
+
+          if (withdrawProduct.product_lot) {
+            await tx.LoadProducts.update({
               where: { id: withdrawProduct.product_lot },
               data: { lotIsActive: false, products_left: 0 },
-            }),
-          ]);
+            });
+          }
         }
-      })
-    );
-
+        if (withdrawProduct.combo_id) {
+          await tx.Products.update({
+            where: {
+              id: withdrawProduct.id,
+            },
+            data: {
+              combo_id: null,
+            },
+          });
+          await tx.ComboProducts.deleteMany({
+            where: {
+              main_product_id: withdrawProduct.id,
+            },
+          });
+        }
+      }
+    });
     // Create new products
     await prisma.$transaction(
-      productsToCreate.map((product) =>
-        prisma.products.create({
+      productsToCreate.map((product) => {
+        
+        return prisma.products.create({
           data: {
             product_name: product.product_name,
             barcode: product.barcode,
             measure: product.measure,
+            product_code: product.product_code,
             product_name_ua: product.product_name_ua,
             product_category: product.product_category,
             product_subcategory: product.product_subcategory,
             product_left: product.product_left,
-            image: product.image,
+            product_image: product.image,
             product_description: product.product_description || "",
             exposition_term: product.exposition_term || "",
             sale_id: product.sale_id || 0,
-            price: product.price,
+            product_price: product.product_price,
+            combo_id: null,
           },
-        })
-      )
+        });
+      })
     );
 
     // Update existing products
     await prisma.$transaction(
-      productsToUpdate.map((product) =>
-        prisma.products.update({
+      productsToUpdate.map((product) => {
+    
+        return prisma.Products.update({
           where: { barcode: product.barcode },
           data: {
             product_name: product.product_name,
             measure: product.measure,
+            product_code: product.product_code,
             product_name_ua: product.product_name_ua,
-            product_category: product.product_category || null,
+            product_category: product.product_category,
             product_subcategory: product.product_subcategory,
-            image: product.image,
-            description: product.description || "",
-            exposition_term: product.exposition_term || "",
+            product_left: product.product_left,
+            product_image: product.product_image,
+            product_description: product.product_description || null,
+            exposition_term: product.exposition_term || null,
             sale_id: product.sale_id || 0,
-            price: product.price,
+            product_price: product.product_price,
+            combo_id: null,
           },
-        })
-      )
+        });
+      })
     );
-
-    // Add load entries and create combo products
-    await prisma.$transaction(
+    const productsWithId = await Promise.all(
       products.map(async (product) => {
         const updateProduct = await prisma.products.findUnique({
           where: { barcode: product.barcode },
         });
 
-        await prisma.LoadProducts.create({
+        return {
+          ...product,
+          id: updateProduct.id, // add the `id` from the database to the product
+        };
+      })
+    );
+    // Add load entries and create combo products
+    await prisma.$transaction(
+      productsWithId.map((productWithId) => {
+        return prisma.LoadProducts.create({
           data: {
-            product_id: updateProduct.id,
+            product_id: productWithId.id,
             load_date: formattedDate,
-            load_quantity: product.load_quantity,
+            load_quantity: productWithId.product_left,
             lotIsActive: true,
-            products_left: product.load_quantity,
-            sale_id: product.sale_id || 0,
-            child_product_barcode: product.child_product_barcode || null,
+            products_left: productWithId.product_left,
+            sale_id: productWithId.sale_id || 0,
+            child_product_barcode: productWithId.child_product_barcode || null,
           },
         });
+      })
+    );
+    const productsWithComboBarcode = productsWithId.filter((product) => {
+      return product.sale_id === 7;
+    });
 
-        if (product.sale_id !== 0) {
+    if (productsWithComboBarcode.length > 0) {
+      const productsWithComboProducts = await Promise.all(
+        productsWithComboBarcode.map(async (product) => {
           const childProduct = await prisma.products.findUnique({
             where: { barcode: product.child_product_barcode },
           });
 
-          await prisma.$transaction([
-            prisma.ComboProducts.updateMany({
-              where: {
-                main_product_id: updateProduct.id,
-                isActive: true,
-              },
-              data: { isActive: false },
-            }),
-            prisma.ComboProducts.create({
-              data: {
-                main_product_id: updateProduct.id,
-                child_product_id: childProduct.id,
-                isActive: true,
-              },
-            }),
-          ]);
+          return {
+            ...product,
+            child_id: childProduct.id, // add the `id` from the database to the product
+          };
+        })
+      );
+
+      await prisma.$transaction(async (tx) => {
+        for (const productWCombo of productsWithComboProducts) {
+          await tx.ComboProducts.updateMany({
+            where: {
+              main_product_id: productWCombo.id,
+              isActive: true,
+            },
+            data: { isActive: false },
+          });
+          const combo = await tx.ComboProducts.create({
+            data: {
+              main_product_id: productWCombo.id,
+              child_product_id: productWCombo.child_id,
+              isActive: true,
+            },
+          });
+          await tx.products.update({
+            where: {
+              id: productWCombo.id,
+            },
+            data: {
+              combo_id: combo.id,
+            },
+          });
         }
-      })
-    );
+      });
+    }
+    //
 
     // Final product update with lot_id
-    await prisma.$transaction(
-      products.map(async (product) => {
-        const finalProduct = await prisma.products.findUnique({
-          where: { barcode: product.barcode },
-        });
-
-        const loadData = await prisma.LoadProducts.findFirst({
-          where: { product_id: finalProduct.id, lotIsActive: true },
+    await prisma.$transaction(async (tx) => {
+      for (const product of productsWithId) {
+        const loadData = await tx.LoadProducts.findFirst({
+          where: { product_id: product.id, lotIsActive: true },
         });
 
         if (loadData) {
-          await prisma.products.update({
-            where: { id: finalProduct.id },
+          await tx.products.update({
+            where: { id: product.id },
             data: { product_lot: loadData.id },
           });
         }
-      })
-    );
+      }
+    });
 
     res.json({
       message: "Products processed successfully",
-      existing: `Found ${productsToUpdate.length} already existing products, not added`,
-      created: `Added ${productsToCreate.length} products`,
+      existing: `Found ${productsToUpdate.length} already existing products, updated`,
+      created: `Added ${productsToCreate.length} new products`,
+      invalidCategory: invalidProducts,
+      notAdded: `Not added ${invalidProducts.length} products due to invalid category or subcatefory (category or subcatefory not exist)`,
+      failedToConvert: abNormalProducts,
     });
   } catch (error) {
     console.error("Error processing products:", error);
     next(httpError(500, "An error occurred while processing products"));
   }
 };
+const withdrawProducts = async (req, res, next) => {
+  const formattedDate = moment().toISOString(true);
+  const products = req.body;
 
+  try {
+    const existingProducts = await prisma.products.findMany({
+      where: { barcode: { in: products.map((p) => p.barcode) } },
+    });
+
+    const existingBarcodes = new Set(existingProducts.map((p) => p.barcode));
+    const productsToWithdraw = products.filter((product) =>
+      existingBarcodes.has(product.barcode)
+    );
+    const productsNotExist = products.filter(
+      (product) => !existingBarcodes.has(product.barcode)
+    );
+
+    await prisma.$transaction(async (tx) => {
+      for (const product of productsToWithdraw) {
+        const withdrawProduct = await tx.products.findUnique({
+          where: { barcode: product.barcode },
+        });
+
+        if (withdrawProduct && withdrawProduct.product_left > 0) {
+          await tx.RemoveProducts.create({
+            data: {
+              product_id: withdrawProduct.id,
+              remove_date: formattedDate,
+              remove_quantity: withdrawProduct.product_left,
+              remove_type_id: 3,
+              isActive: false,
+              load_id: withdrawProduct.product_lot || "",
+            },
+          });
+
+          if (withdrawProduct.product_lot) {
+            await tx.LoadProducts.update({
+              where: { id: withdrawProduct.product_lot },
+              data: { lotIsActive: false, products_left: 0 },
+            });
+          }
+        }
+        if (withdrawProduct.combo_id) {
+          await tx.Products.update({
+            where: {
+              id: withdrawProduct.id,
+            },
+            data: {
+              combo_id: null,
+            },
+          });
+          await tx.ComboProducts.deleteMany({
+            where: {
+              main_product_id: withdrawProduct.id,
+            },
+          });
+        }
+        await tx.Products.update({
+          where: {
+            id: withdrawProduct.id,
+          },
+          data: {
+            product_left: 0,
+          },
+        });
+      }
+    });
+    res.json({
+      message: "Products processed successfully",
+      updated: `Found ${productsToWithdraw.length} already existing products, updated`,
+      noExist: `Not added ${productsNotExist.length} products, as products not exist`,
+      nonExistingProducts: productsNotExist,
+    });
+  } catch (error) {
+    console.error("Error processing products:", error);
+    next(httpError(500, "An error occurred while processing products"));
+  }
+};
 async function updateProductQuantities() {
   const products = await Product.find();
   for (const product of products) {
@@ -591,4 +527,6 @@ module.exports = {
   searchProducts: ctrlWrapper(searchProducts),
   getProductById: ctrlWrapper(getProductById),
   addProducts: ctrlWrapper(addProducts),
+  withdrawProducts: ctrlWrapper(withdrawProducts),
+  getSingleProduct: ctrlWrapper(getSingleProduct),
 };

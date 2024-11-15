@@ -6,6 +6,7 @@ const axios = require("axios");
 const { saveBuffer, initBuffer } = require("../helpers");
 const { FISCAL_HOST, AUTH_MERCH_TOKEN } = process.env;
 const fd = require("../data/fiscalData.json");
+const { error } = require("console");
 let bufferAccess = false;
 
 const apiInstance = axios.create({
@@ -20,11 +21,13 @@ const apiInstance = axios.create({
 });
 
 const saleCheck = async (body) => {
-  console.log("saleCheck runs");
+  console.log("saleCheck runs body", body);
   bufferAccess = true;
   let buffer;
+  if (!body) return { status: "Fiscal body error", error: true };
   try {
     buffer = await initBuffer();
+    console.log("buffer", buffer);
     if (buffer.length > 0) {
       // Buffer is not empty, append new data and save
       buffer.push(body);
@@ -44,7 +47,7 @@ const saleCheck = async (body) => {
           buffer.push(body);
           await saveBuffer(buffer);
           console.log("response.data.res !== 0");
-          return response.data
+          return response.data;
         }
         console.log("response after if in saleCheck");
         return response.data;
@@ -66,7 +69,7 @@ const saleCheck = async (body) => {
         } else {
           console.error("Error Message:", error.message);
         }
-        console.log('salecheck error', error)
+        console.log("salecheck error", error);
         return null; // Returning null to indicate failure
       }
     }

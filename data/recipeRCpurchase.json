@@ -1,39 +1,39 @@
 [
   {
-    "id": 17,
-    "product_name": "Misso Мигдаль смажений, 45г",
-    "product_code": "532",
-    "barcode": "4820146730175",
+    "id": 52,
+    "product_name": "Борщ, 450г",
+    "product_code": "567",
+    "barcode": "2000000000145",
     "measure": "шт.",
     "product_name_ru": null,
-    "product_name_ua": "Misso Мигдаль смажений, 45г",
+    "product_name_ua": "Борщ, 450г",
     "product_description": null,
-    "good_category": "Горіхи і сухофрукти",
-    "product_category": 1,
-    "product_subcategory": 13,
-    "product_left": "5",
-    "product_image": "img/snacks.webp",
-    "product_price": "135.86",
+    "good_category": "Другі страви",
+    "product_category": 2,
+    "product_subcategory": 4,
+    "product_left": "10",
+    "product_image": "img/dinner.webp",
+    "product_price": "53.5",
     "product_discount": null,
     "product_rating": null,
-    "product_lot": 1,
-    "exposition_term": 5,
+    "product_lot": 11,
+    "exposition_term": null,
     "sale_id": 7,
     "discount_price_1": null,
     "discount_price_2": null,
     "discount_price_3": null,
-    "updatedAt": "2024-10-25T15:40:21.943Z",
-    "combo_id": 1,
+    "updatedAt": "2024-11-08T15:50:31.480Z",
+    "combo_id": 11,
     "Categories": {
-      "id": 1,
-      "category_name": "Снеки",
+      "id": 2,
+      "category_name": "Готові обіди",
       "category_discount": null,
-      "category_image": "img/icons/snacks.webp"
+      "category_image": "img/icons/dinners.webp"
     },
     "Subcategories": {
-      "id": 13,
-      "subcategory_name": "Горіхи і сухофрукти",
-      "category_ref": 1,
+      "id": 4,
+      "subcategory_name": "Другі страви",
+      "category_ref": 2,
       "subcategory_discount": null
     },
     "Sales": {
@@ -45,53 +45,24 @@
       "sale_description": "Акція для парних товарів",
       "sale_custom_id": 7
     },
-    "LoadProducts": [
+    "LoadProducts_LoadProducts_product_idToProducts": [
       {
         "load_date": "2024-03-01T00:00:00.000Z"
       }
     ],
     "ComboProducts_Products_combo_idToComboProducts": {
-      "main_product_id": 17,
-      "child_product_id": 35,
-      "combo_id": 1,
+      "main_product_id": 52,
+      "child_product_id": 37,
+      "combo_id": 11,
       "isActive": true,
       "Products_ComboProducts_child_product_idToProducts": {
-        "product_left": "5"
+        "product_left": "0"
       }
     },
     "inCartQuantity": 1,
     "priceDecrement": 0,
-    "priceAfterDiscount": "122.27",
+    "priceAfterDiscount": "53.5",
     "hasLowerPrice": false,
-    "dateTime": "2024-10-25 15:58:55:6900"
-  },
-  {
-    "id": 35,
-    "product_name": "Батончик Nuts, 42г",
-    "product_code": "550",
-    "barcode": "8593893745841",
-    "measure": "шт.",
-    "product_name_ru": null,
-    "product_name_ua": "Батончик Nuts, 42г",
-    "product_description": null,
-    "good_category": "Батончики",
-    "product_category": 1,
-    "product_subcategory": 1,
-    "product_left": "5",
-    "product_image": "img/snacks.webp",
-    "product_price": "50.83",
-    "product_discount": null,
-    "product_rating": null,
-    "product_lot": null,
-    "exposition_term": null,
-    "sale_id": 0,
-    "discount_price_1": null,
-    "discount_price_2": null,
-    "discount_price_3": null,
-    "updatedAt": "2024-10-25T14:28:35.183Z",
-    "combo_id": null,
-    "inCartQuantity": 1,
-    "priceAfterDiscount": "45.75",
-    "dateTime": "2024-10-25 15:58:55:6900"
+    "dateTime": "2024-11-12 16:47:14:2840"
   }
 ]

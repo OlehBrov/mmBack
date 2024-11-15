@@ -26,7 +26,7 @@ Promise.config({
   cancellation: true,
 });
 
-const createFakeTerminalResponce = (purchData) => {
+const createFakeTerminalResponce = async (purchData) => {
   const dateObj = new Date();
   const date = dateObj.getDate().toString().padStart(2, "0");
   const month = dateObj.getMonth();
@@ -47,12 +47,29 @@ const createFakeTerminalResponce = (purchData) => {
     error: false,
     errorDescription: "",
   };
+  
+  // const resp = {
+  //   ...fakeBankResponse,
+  //   params: {
+  //     ...fakeBankResponse.params, // Spread the existing `params` object
+  //     amount: purchData.params.amount,
+  //     date: `${date}.${corMonth}.${year}`,
+  //     time: `${hours}:${minutes}:${seconds}`,
+  //   },
+  //   error: true,
+  //   errorDescription: "Canceled",
+  // };
+  
 
-  return resp;
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(resp);
+    }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
+  });
 };
 
 const productsSell = async (req, res) => {
-  console.log()
+  console.log();
   if (!req.body || !req.body.cartProducts.length) {
     return res.status(400).json({
       message: "Failed to process the purchase",
@@ -73,6 +90,7 @@ const productsSell = async (req, res) => {
   console.log("purchase 1", purchase);
   /*
 to terminal
+*/
   const {
     promise: transactionPromise,
     resolve,
@@ -80,44 +98,46 @@ to terminal
     cancel,
   } = withResolvers();
   setupPurchaseHandlers(resolve, reject);
-  writer(purchase).catch(reject);
 
-  eventEmitter.on("cancelPurchase", () => {
-    console.log("Cancellation success requested");
-    cancel({
-      error: true,
-      errorDescription: "Purchase cancelled by user",
+  try {
+    // writer(purchase).catch(reject);
+    eventEmitter.once("cancelPurchase", () => {
+      console.log("Cancellation success requested");
+      cancel({
+        error: true,
+        errorDescription: "Purchase cancelled by user",
+      });
     });
-    
-  });
- */
+    //Fake response
+    const response = await createFakeTerminalResponce(purchase);
+   
+    // const response = await transactionPromise;
+    console.log("Transaction completed:", response);
 
-  const response = createFakeTerminalResponce(purchase);
-  
-  //REAL transaction
-  // const response = await transactionPromise;
+    if (response.error) {
+      // throw new Error(response.errorDescription);
+      return res
+        .status(403)
+        .json({ errorDescription: response.errorDescription });
+    }
+    if (!response.error && response.method === "Purchase") {
+      purchaseDbHandler(purchaseProducts, response);
+    }
+    const fiscalData = await recipeReqCreator(purchaseProducts, response);
+    const fiscalResponse = await saleCheck(fiscalData);
 
-  console.log("Transaction completed:", response);
-  if (response.error) {
-    // throw new Error(response.errorDescription);
-    return res.status(403).json({errorDescription:response.errorDescription})
-
+    res.status(200).send(fiscalResponse);
+  } catch (error) {
+    // Handle promise rejection due to cancellation or other errors
+    if (
+      error.error &&
+      error.errorDescription === "Purchase cancelled by user"
+    ) {
+      return res.status(403).json({ errorDescription: error.errorDescription });
+    }
+    console.error("Unexpected error during purchase:", error);
+    res.status(500).json({ errorDescription: "An unexpected error occurred" });
   }
-  if (!response.error && response.method === "Purchase") {
-  purchaseDbHandler(purchaseProducts, response)
-}
-  const fiscalData = await recipeReqCreator(purchaseProducts, response);
-  const fiscalResponse = await saleCheck(fiscalData);
-
-  res.status(200).send(fiscalResponse);
-
-  // } catch (error) {
-  //   console.log("Transaction error:", error);
-  //   res.status(400).json({
-  //     message: "Failed to process the purchase",
-  //     description: error.message || "Unknown error",
-  //   });
-  // }
 };
 
 // const productsSell = async (req, res) => {
