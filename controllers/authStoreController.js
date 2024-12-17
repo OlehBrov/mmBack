@@ -7,53 +7,67 @@ const { ctrlWrapper } = require("../helpers");
 
 const { httpError } = require("../helpers/");
 
-
 const refreshToken = async (req, res, next) => {
-  console.log('refreshToken invoke', req.body)
-  
+  console.log("refreshToken invoke", req.body);
+
   const { refreshToken } = req.body;
   if (!refreshToken) {
-    return httpError(401);
+    return next(httpError(401, "Refresh token is required"));
   }
 
-  const { auth_id } = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET_KEY);
-  console.log('refreshToken auth_id', auth_id)
-  const prismaStore = await prisma.Store.findUnique({
-    where: {
-      auth_id: auth_id,
-    },
-  });
-  console.log('prismaStore', prismaStore)
-  if (!prismaStore) {
-    next(httpError(401, "Not authorized"));
+  let auth_id;
+  try {
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET_KEY);
+    auth_id = decoded.auth_id;
+  } catch (err) {
+    console.error("Refresh token verification failed:", err.message);
+    return next(httpError(401, "Invalid or expired refresh token"));
   }
-  const token = jwt.sign(
-    { auth_id: prismaStore.auth_id, store_id: prismaStore.store_id },
-    AUTH_TOKEN_SECRET_KEY,
-    {
-      expiresIn: "1m",
+  try {
+    // Find the store in the database
+    const prismaStore = await prisma.Store.findUnique({
+      where: { auth_id },
+    });
+
+    if (!prismaStore) {
+      console.error("Store not found for auth_id:", auth_id);
+      return next(httpError(401, "Store not authorized"));
     }
-  );
 
-  const updateStore = await prisma.Store.update({
-    where: {
-      auth_id: auth_id,
-    },
-    data: {
-      token: token,
-    },
-  });
+    // Generate a new access token
+    const token = jwt.sign(
+      { auth_id: prismaStore.auth_id, store_id: prismaStore.store_id },
+      AUTH_TOKEN_SECRET_KEY,
+      { expiresIn: "1m" }
+    );
 
-  res.json({
-    message: "token refreshed",
-    token: updateStore.token,
-  });
+    // Update the store with the new token
+    const updatedStore = await prisma.Store.update({
+      where: { auth_id },
+      data: { token },
+    });
+
+    console.log(
+      "Token refreshed successfully for store:",
+      prismaStore.store_id
+    );
+
+    // Send the new token to the client
+    res.json({
+      message: "Token refreshed",
+      token: updatedStore.token,
+    });
+  } catch (err) {
+    console.error("Error during token refresh:", err.message);
+    next(httpError(401, "Refresh Token Error"));
+  }
 };
 
 const logInStore = async (req, res, next) => {
-  console.log('logInStore invoke')
+  console.log("logInStore invoke");
   const { login, password } = req.body;
-  console.log('login', login)
+  console.log("login", login);
   const store = await prisma.Store.findUnique({ where: { auth_id: login } });
   if (!store) {
     return httpError(401);
@@ -71,7 +85,7 @@ const logInStore = async (req, res, next) => {
       expiresIn: "1m",
     }
   );
-  const refreshToken =  jwt.sign(
+  const refreshToken = jwt.sign(
     { auth_id: store.auth_id, store_id: store.id },
     REFRESH_TOKEN_SECRET_KEY,
     { expiresIn: "1d" }
@@ -91,8 +105,7 @@ const logInStore = async (req, res, next) => {
     auth_id: updateStore.auth_id,
     token: updateStore.token,
     refreshToken,
-    role: updateStore.role
-    
+    role: updateStore.role,
   });
 };
 

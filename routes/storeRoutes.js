@@ -14,6 +14,8 @@ router.get("/product", storeAuthenticate, productsController.getProductById);
 router.get("/single", productsController.getSingleProduct);
 router.post("/add", productNormalizer, checkIfProductCategory, productsController.addProducts);
 router.post("/withdraw", productsController.withdrawProducts);
-router.post("/image", upload.single("productImage"), imageController.saveImage);
+// router.post("/image", upload.single("productImage"), imageController.saveImage);
+router.post("/image", imageController.saveImage);
+router.post("/update", productsController.updateProducts)
 
 module.exports = router;

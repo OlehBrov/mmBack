@@ -10,10 +10,12 @@ const purchaseDbHandler = async (cartProductsObject, bankResponse) => {
     const [day, month, year] = params.date.split(".");
     const isoDate = `${year}-${month}-${day}`;
     const isoDateTime = `${isoDate}T${params.time}`;
-    const dateObject = new Date(isoDateTime);
+    const dateObject = moment(isoDateTime).toISOString(true);
+    const validDateTime = moment(dateObject).format('YYYY-MM-DDTHH:mm:ss.SSS')
+    console.log('dateObject', dateObject)
     return {
       product_id: product.id,
-      remove_date: dateObject,
+      remove_date: `${validDateTime}+00:00`,
       remove_quantity: product.inCartQuantity,
       remove_type_id: 1,
       remove_cost: product.product_price * product.inCartQuantity,
@@ -38,20 +40,46 @@ const purchaseDbHandler = async (cartProductsObject, bankResponse) => {
   });
 
   const updateProducts = async () => {
-    for (const product of products) {
-      console.log("updateProducts product", product);
-      const updProd = await prisma.LoadProducts.update({
-        where: {
-          id: product.product_lot,
-        },
-        data: {
-          products_left: {
-            decrement: product.inCartQuantity,
+    await prisma.$transaction(async (tx) => {
+      for (const product of removeProductsData) {
+        await prisma.LoadProducts.update({
+          where: {
+            id: product.load_id,
           },
-        },
-      });
-      console.log("updProd", updProd);
-    }
+          data: {
+            products_left: {
+              decrement: parseFloat(product.remove_quantity),
+            },
+          },
+        });
+
+        await tx.Products.update({
+          where: {
+            id: product.product_id,
+          },
+          data: {
+            product_left: {
+              decrement: parseFloat(product.remove_quantity),
+            },
+          },
+        });
+      }
+    });
+
+    // for (const product of products) {
+    //   console.log("updateProducts product", product);
+    //   const updProd = await prisma.LoadProducts.update({
+    //     where: {
+    //       id: product.product_lot,
+    //     },
+    //     data: {
+    //       products_left: {
+    //         decrement: product.inCartQuantity,
+    //       },
+    //     },
+    //   });
+
+    // }
   };
 
   await updateProducts();

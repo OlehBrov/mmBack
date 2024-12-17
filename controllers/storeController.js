@@ -1,14 +1,23 @@
 // const { sqlPool } = require("../config/connectSQL");
 const path = require("path");
 const fs = require("fs/promises");
-const { ctrlWrapper } = require("../helpers");
+const { ctrlWrapper, updateProductLoadLots } = require("../helpers");
 const { json } = require("express");
 const { httpError } = require("../helpers");
 const { prisma } = require("../config/db/dbConfig");
+const { MM_HOST } = process.env;
 const moment = require("moment");
 const { equal, when } = require("joi");
-
+const { wsServer, checkIdleFrontStatus } = require("../socket/heartbeat");
+const { some } = require("bluebird");
+const imagesDir = process.env.IMAGE_DIR;
 const dataPath = path.join(__dirname, "..", "data", "faker.json");
+const productsTempUpdatesPath = path.join(
+  __dirname,
+  "..",
+  "data",
+  "tempProductUpdateData.json"
+);
 
 const getAllStoreProducts = async (req, res, next) => {
   const { auth_id } = req.store;
@@ -107,6 +116,7 @@ const getAllStoreProducts = async (req, res, next) => {
     }
 
     // Return the filtered products, total count, and distinct subcategories and categories
+
     return res.status(200).json({
       products: filteredProducts,
       totalProducts: productsCount,
@@ -118,7 +128,6 @@ const getAllStoreProducts = async (req, res, next) => {
     next(error);
   }
 };
-
 const getProductById = async (req, res, next) => {
   const { comboId } = req.query;
 
@@ -145,8 +154,7 @@ const getProductById = async (req, res, next) => {
 };
 const getSingleProduct = async (req, res, next) => {
   const { barcode } = req.query;
-  console.log("req.query", req.query);
-  console.log("barcode", barcode);
+
   const product = await prisma.Products.findUnique({
     where: {
       barcode,
@@ -154,8 +162,9 @@ const getSingleProduct = async (req, res, next) => {
   });
 
   if (!product) {
-    return res.status(200).json({
+    return res.status(404).json({
       message: "No such product found",
+      errStatus: 404,
     });
   }
   return res.status(200).json({
@@ -165,7 +174,7 @@ const getSingleProduct = async (req, res, next) => {
 const searchProducts = async (req, res, next) => {
   const { auth_id } = req.store;
   const { searchQuery } = req.query;
-  console.log("searchQuery", searchQuery);
+  // console.log("searchQuery", searchQuery);
   if (searchQuery.length < 3) {
     console.log("short request");
     return null;
@@ -195,7 +204,9 @@ const searchProducts = async (req, res, next) => {
 
 const addProducts = async (req, res, next) => {
   const formattedDate = moment().toISOString(true);
-
+  const validDateTime = moment(formattedDate).format("YYYY-MM-DDTHH:mm:ss.SSS");
+  console.log("validDateTime", validDateTime);
+  const dateTime = moment().toISOString(true);
   const { validProducts: products, invalidProducts, abNormalProducts } = req;
 
   try {
@@ -210,98 +221,88 @@ const addProducts = async (req, res, next) => {
     const productsToCreate = products.filter(
       (product) => !existingBarcodes.has(product.barcode)
     );
+    if (productsToCreate.length) {
+      const imageExtensions = [".jpg", ".jpeg", ".webp", ".png"]; // Supported image extensions
 
-    await prisma.$transaction(async (tx) => {
-      for (const product of productsToUpdate) {
-        const withdrawProduct = await tx.products.findUnique({
-          where: { barcode: product.barcode },
-        });
+      //`${MM_HOST}/api/product-image/${fileName}`
 
-        if (withdrawProduct && withdrawProduct.product_left > 0) {
-          await tx.RemoveProducts.create({
-            data: {
-              product_id: withdrawProduct.id,
-              remove_date: formattedDate,
-              remove_quantity: withdrawProduct.product_left,
-              remove_type_id: 3,
-              isActive: false,
-              load_id: withdrawProduct.product_lot || "",
-            },
-          });
-
-          if (withdrawProduct.product_lot) {
-            await tx.LoadProducts.update({
-              where: { id: withdrawProduct.product_lot },
-              data: { lotIsActive: false, products_left: 0 },
-            });
+      const productsWithImagePath = await Promise.all(
+        productsToCreate.map(async (product) => {
+          if (product.product_image && product.product_image !== "") {
+            return product;
           }
-        }
-        if (withdrawProduct.combo_id) {
-          await tx.Products.update({
-            where: {
-              id: withdrawProduct.id,
-            },
+          let imagePath = `${MM_HOST}/api/product-image/default-product.jpg`;
+          for (const ext of imageExtensions) {
+            const fullPath = path.join(imagesDir, `${product.barcode}${ext}`);
+            console.log("fullPath", fullPath);
+            try {
+              await fs.access(fullPath); // If file exists, fs.access will not throw an error
+              imagePath = `${MM_HOST}/api/product-image/${product.barcode}${ext}`;
+              console.log("imagePath in loop", imagePath);
+              break; // Exit the loop if image is found
+            } catch (err) {
+              // Do nothing, try next extension
+              console.log('fs.access err', err)
+            }
+          }
+          console.log("imagePath after loop", imagePath);
+          return {
+            ...product,
+            product_image: imagePath,
+          };
+        })
+      );
+      console.log("productsWithImagePath", productsWithImagePath);
+      // Create new products
+      await prisma.$transaction(
+        productsWithImagePath.map((product) => {
+          console.log("productsWithImagePath product", product);
+          return prisma.products.create({
             data: {
+              product_name: product.product_name,
+              barcode: product.barcode,
+              measure: product.measure,
+              product_code: product.product_code,
+              product_name_ua: product.product_name_ua,
+              product_category: product.product_category,
+              product_subcategory: product.product_subcategory,
+              product_left: product.product_left,
+              product_image: product.product_image,
+              product_description: product.product_description || "",
+              exposition_term: product.exposition_term || "",
+              sale_id: product.sale_id || 0,
+              product_price: product.product_price,
               combo_id: null,
             },
           });
-          await tx.ComboProducts.deleteMany({
-            where: {
-              main_product_id: withdrawProduct.id,
-            },
-          });
-        }
-      }
-    });
-    // Create new products
+        })
+      );
+    }
+    // Update existing products
+
     await prisma.$transaction(
-      productsToCreate.map((product) => {
-        
-        return prisma.products.create({
+      productsToUpdate.map((product) => {
+        return prisma.Products.update({
+          where: { barcode: product.barcode },
           data: {
-            product_name: product.product_name,
-            barcode: product.barcode,
-            measure: product.measure,
-            product_code: product.product_code,
-            product_name_ua: product.product_name_ua,
-            product_category: product.product_category,
-            product_subcategory: product.product_subcategory,
+            product_name: product?.product_name,
+            measure: product?.measure,
+            product_code: product?.product_code,
+            product_name_ua: product?.product_name_ua,
+            product_category: product?.product_category,
+            product_subcategory: product?.product_subcategory,
             product_left: product.product_left,
-            product_image: product.image,
-            product_description: product.product_description || "",
-            exposition_term: product.exposition_term || "",
-            sale_id: product.sale_id || 0,
-            product_price: product.product_price,
+            product_image: product?.product_image,
+            product_description: product?.product_description || null,
+            exposition_term: product?.exposition_term || null,
+            sale_id: product?.sale_id || 0,
+            product_price: product?.product_price,
             combo_id: null,
           },
         });
       })
     );
 
-    // Update existing products
-    await prisma.$transaction(
-      productsToUpdate.map((product) => {
-    
-        return prisma.Products.update({
-          where: { barcode: product.barcode },
-          data: {
-            product_name: product.product_name,
-            measure: product.measure,
-            product_code: product.product_code,
-            product_name_ua: product.product_name_ua,
-            product_category: product.product_category,
-            product_subcategory: product.product_subcategory,
-            product_left: product.product_left,
-            product_image: product.product_image,
-            product_description: product.product_description || null,
-            exposition_term: product.exposition_term || null,
-            sale_id: product.sale_id || 0,
-            product_price: product.product_price,
-            combo_id: null,
-          },
-        });
-      })
-    );
     const productsWithId = await Promise.all(
       products.map(async (product) => {
         const updateProduct = await prisma.products.findUnique({
@@ -326,6 +327,7 @@ const addProducts = async (req, res, next) => {
             products_left: productWithId.product_left,
             sale_id: productWithId.sale_id || 0,
             child_product_barcode: productWithId.child_product_barcode || null,
+            load_date_time: `${validDateTime}+00:00`,
           },
         });
       })
@@ -380,19 +382,35 @@ const addProducts = async (req, res, next) => {
     // Final product update with lot_id
     await prisma.$transaction(async (tx) => {
       for (const product of productsWithId) {
-        const loadData = await tx.LoadProducts.findFirst({
+        const loadData = await tx.LoadProducts.findMany({
           where: { product_id: product.id, lotIsActive: true },
+          orderBy: {
+            load_date_time: {
+              sort: "desc",
+              nulls: "last",
+            },
+          },
+        });
+        const sumData = await tx.LoadProducts.aggregate({
+          where: { product_id: product.id, lotIsActive: true },
+          _sum: {
+            products_left: true,
+          },
         });
 
         if (loadData) {
+          console.log("sumData in update if", sumData);
           await tx.products.update({
             where: { id: product.id },
-            data: { product_lot: loadData.id },
+            data: {
+              product_lot: loadData[0].id,
+              product_left: sumData._sum.products_left,
+            },
           });
         }
       }
     });
-
+    wsServer.emit("product-updated");
     res.json({
       message: "Products processed successfully",
       existing: `Found ${productsToUpdate.length} already existing products, updated`,
@@ -408,46 +426,137 @@ const addProducts = async (req, res, next) => {
 };
 const withdrawProducts = async (req, res, next) => {
   const formattedDate = moment().toISOString(true);
+  const validDateTime = moment(formattedDate).format(
+    "YYYY-MM-DDTHH:mm:ss.SSS+00:00"
+  );
   const products = req.body;
-
+  console.log("products", products);
+  if (!products.length) {
+    res.status(204).json({
+      message: "No products provided",
+    });
+  }
   try {
     const existingProducts = await prisma.products.findMany({
       where: { barcode: { in: products.map((p) => p.barcode) } },
     });
 
+    const proceedProducts = existingProducts.map((prod) => {
+      const decrementValue = products.find((p) => {
+        return p.barcode === prod.barcode;
+      });
+      return {
+        ...prod,
+        decrement: decrementValue.quantity,
+        limit: decrementValue.limit,
+      };
+    });
+
     const existingBarcodes = new Set(existingProducts.map((p) => p.barcode));
-    const productsToWithdraw = products.filter((product) =>
+    const productsToWithdraw = proceedProducts.filter((product) =>
       existingBarcodes.has(product.barcode)
     );
     const productsNotExist = products.filter(
       (product) => !existingBarcodes.has(product.barcode)
     );
+    const productsNoQuantity = [];
+    const productsHasQuantity = [];
+    // console.log("productsToWithdraw", productsToWithdraw);
 
+    for (const prod of productsToWithdraw) {
+      prod.product_left > 0
+        ? productsHasQuantity.push(prod)
+        : productsNoQuantity.push(prod);
+    }
+
+    if (!productsHasQuantity.length) {
+      res.status(204).json({
+        message: "Provided products already left 0",
+      });
+    }
+    // console.log("productsHasQuantity", productsHasQuantity);
     await prisma.$transaction(async (tx) => {
-      for (const product of productsToWithdraw) {
+      for (const product of productsHasQuantity) {
         const withdrawProduct = await tx.products.findUnique({
           where: { barcode: product.barcode },
         });
 
-        if (withdrawProduct && withdrawProduct.product_left > 0) {
-          await tx.RemoveProducts.create({
-            data: {
-              product_id: withdrawProduct.id,
-              remove_date: formattedDate,
-              remove_quantity: withdrawProduct.product_left,
-              remove_type_id: 3,
-              isActive: false,
-              load_id: withdrawProduct.product_lot || "",
+        const withdrawProductLots = await tx.LoadProducts.findMany({
+          where: {
+            AND: [
+              {
+                product_id: { equals: product.id },
+              },
+              {
+                lotIsActive: {
+                  equals: true,
+                },
+              },
+            ],
+          },
+          orderBy: {
+            load_date_time: {
+              sort: "asc",
+              nulls: "first",
             },
-          });
+          },
+        });
 
-          if (withdrawProduct.product_lot) {
+        const lotsUpdateData = updateProductLoadLots(
+          product,
+          withdrawProductLots
+        );
+        // console.log("lotsUpdateData", lotsUpdateData);
+        if (lotsUpdateData.length) {
+          for (const lot of lotsUpdateData) {
+            console.log("const lot of lotsUpdateData", lot);
             await tx.LoadProducts.update({
-              where: { id: withdrawProduct.product_lot },
-              data: { lotIsActive: false, products_left: 0 },
+              where: {
+                id: lot.id,
+              },
+              data: {
+                product_id: lot.product_id,
+                load_date: lot.load_date,
+                load_quantity: lot.load_quantity,
+                lotIsActive: lot.lotIsActive ? true : false,
+                products_left: lot.products_left,
+                sale_id: lot.sale_id,
+                child_product_barcode: lot.child_product_barcode,
+                load_date_time: lot.load_date_time,
+              },
+            });
+
+            await tx.RemoveProducts.create({
+              data: {
+                product_id: withdrawProduct.id,
+                remove_date: validDateTime,
+                remove_quantity: lot.decrementAmount,
+                remove_type_id: 3,
+                isActive: false,
+                load_id: lot.id || null,
+              },
             });
           }
         }
+        if (withdrawProduct && withdrawProduct.product_left > 0) {
+          // await tx.RemoveProducts.create({
+          //   data: {
+          //     product_id: withdrawProduct.id,
+          //     remove_date: validDateTime,
+          //     remove_quantity: withdrawQuantity,
+          //     remove_type_id: 3,
+          //     isActive: false,
+          //     load_id: withdrawProduct.product_lot || "",
+          //   },
+          // });
+          // if (withdrawProduct.product_lot) {
+          //   await tx.LoadProducts.update({
+          //     where: { id: withdrawProduct.product_lot },
+          //     data: { lotIsActive: false, products_left: 0 },
+          //   });
+          // }
+        }
+
         if (withdrawProduct.combo_id) {
           await tx.Products.update({
             where: {
@@ -463,20 +572,54 @@ const withdrawProducts = async (req, res, next) => {
             },
           });
         }
+        const sumData = await tx.LoadProducts.aggregate({
+          where: { product_id: product.id, lotIsActive: true },
+          _sum: {
+            products_left: true,
+          },
+        });
+
+        const activeLots = await tx.LoadProducts.findMany({
+          where: {
+            AND: [
+              {
+                product_id: {
+                  equals: withdrawProduct.id,
+                },
+              },
+              {
+                lotIsActive: {
+                  equals: true,
+                },
+              },
+            ],
+          },
+          orderBy: {
+            load_date_time: {
+              sort: "desc",
+              nulls: "last",
+            },
+          },
+        });
+        console.log("activeLots", activeLots);
         await tx.Products.update({
           where: {
             id: withdrawProduct.id,
           },
           data: {
-            product_left: 0,
+            product_left: sumData._sum.products_left
+              ? sumData._sum.products_left
+              : 0,
+            product_lot: activeLots[0]?.id || null,
           },
         });
       }
     });
+    wsServer.emit("product-updated");
     res.json({
-      message: "Products processed successfully",
-      updated: `Found ${productsToWithdraw.length} already existing products, updated`,
-      noExist: `Not added ${productsNotExist.length} products, as products not exist`,
+      message: "Products deleted successfully",
+      updated: `Deleted ${productsToWithdraw.length} products`,
+      noExist: `Not deleted ${productsNotExist.length} products, as products not exist`,
       nonExistingProducts: productsNotExist,
     });
   } catch (error) {
@@ -484,49 +627,107 @@ const withdrawProducts = async (req, res, next) => {
     next(httpError(500, "An error occurred while processing products"));
   }
 };
-async function updateProductQuantities() {
-  const products = await Product.find();
-  for (const product of products) {
-    const totalQuantity = await product.totalQuantity;
-    product.quantity = totalQuantity;
-    await product.save();
-  }
-}
-const readFileData = async (req, res, next) => {
+
+const updateProducts = async (req, res) => {
+  const possibleUpdateKeys = [
+    "product_name",
+    "product_code",
+    "measure",
+    "product_name_ru",
+    "product_name_ua",
+    "product_description",
+    "product_image",
+    "product_price",
+    "product_discount",
+    "exposition_term",
+    "sale_id",
+    "discount_price_1",
+    "discount_price_2",
+    "discount_price_3",
+    "combo_id",
+    "product_category",
+    "product_subcategory",
+  ];
   try {
-    // await updateProductQuantities()
-    const results = await Product.find();
-    // const readFile = await fs.readFile(dataPath, "utf-8");
-    // const data = JSON.parse(readFile);
-    res.json({ data: results });
+    const productsData = req.body;
+
+    const noBarcode = productsData.filter(
+      (prod) => prod.barcode === "" || !prod.barcode
+    );
+
+    if (noBarcode.length > 0) {
+      res.status(400).json({
+        message: "Barcode must be provided to each product",
+      });
+    }
+
+    const formattedUpdateData = productsData.map((product) => {
+      const { barcode, ...rest } = product;
+      const keysNumber = Object.keys(rest).length;
+      const filtered = Object.keys(rest).filter((key) =>
+        possibleUpdateKeys.includes(key)
+      );
+      if (keysNumber !== filtered.length)
+        throw Error(
+          `Not valid keys passed. Possible keys to update: ${possibleUpdateKeys}`
+        );
+      return {
+        barcode,
+        data: rest,
+      };
+    });
+
+    await saveTempFileProductsData(formattedUpdateData);
+
+    res.status(201).json({
+      message: "Data will be sent to db",
+    });
   } catch (error) {
-    console.log(error.message);
+    console.log("updateProducts error", error);
+    res.status(400).json({ error: error.message });
   }
 };
 
-const createFileData = async (filepath, data) => {
+const saveTempFileProductsData = async (tempData) => {
+  console.log("saveTempFileProductsData invoke");
   try {
-    return await fs.writeFile(filepath, JSON.stringify(data, null, 2));
+    const tempFileData = JSON.parse(
+      await fs.readFile(productsTempUpdatesPath, "utf-8")
+    );
+    const updatedFile = [...tempFileData, ...tempData];
+    await fs.writeFile(
+      productsTempUpdatesPath,
+      JSON.stringify(updatedFile, null, 2)
+    );
+    checkIdleFrontStatus();
+    return true;
   } catch (error) {
-    console.log(error.message);
+    console.log("saveTempFileProductsData error", error);
+    return error;
   }
 };
 
-const updateFileData = async (path, data) => {
+const sendTempDataToDB = async () => {
   try {
-    const fileData = JSON.parse(await fs.readFile(dataPath, "utf-8"));
-    const updatedData = [...fileData, data];
-    return await createFileData(dataPath, updatedData);
   } catch (error) {}
 };
 
+// const updateFileData = async (path, data) => {
+//   try {
+//     const fileData = JSON.parse(await fs.readFile(dataPath, "utf-8"));
+//     const updatedData = [...fileData, data];
+//     return await createFileData(dataPath, updatedData);
+//   } catch (error) {}
+// };
+
 module.exports = {
-  readFileData: ctrlWrapper(readFileData),
-  updateFileData: ctrlWrapper(updateFileData),
+  // readFileData: ctrlWrapper(readFileData),
+  // updateFileData: ctrlWrapper(updateFileData),
   getAllStoreProducts: ctrlWrapper(getAllStoreProducts),
   searchProducts: ctrlWrapper(searchProducts),
   getProductById: ctrlWrapper(getProductById),
   addProducts: ctrlWrapper(addProducts),
   withdrawProducts: ctrlWrapper(withdrawProducts),
   getSingleProduct: ctrlWrapper(getSingleProduct),
+  updateProducts: ctrlWrapper(updateProducts),
 };

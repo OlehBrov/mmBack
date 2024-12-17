@@ -47,7 +47,7 @@ const createFakeTerminalResponce = async (purchData) => {
     error: false,
     errorDescription: "",
   };
-  
+
   // const resp = {
   //   ...fakeBankResponse,
   //   params: {
@@ -59,7 +59,6 @@ const createFakeTerminalResponce = async (purchData) => {
   //   error: true,
   //   errorDescription: "Canceled",
   // };
-  
 
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -100,7 +99,7 @@ to terminal
   setupPurchaseHandlers(resolve, reject);
 
   try {
-    // writer(purchase).catch(reject);
+     writer(purchase).catch(reject);
     eventEmitter.once("cancelPurchase", () => {
       console.log("Cancellation success requested");
       cancel({
@@ -109,9 +108,9 @@ to terminal
       });
     });
     //Fake response
-    const response = await createFakeTerminalResponce(purchase);
-   
-    // const response = await transactionPromise;
+    // const response = await createFakeTerminalResponce(purchase);
+
+    const response = await transactionPromise;
     console.log("Transaction completed:", response);
 
     if (response.error) {

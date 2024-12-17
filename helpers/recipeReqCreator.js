@@ -10,8 +10,8 @@ const transDataPath = path.join(
 
 const recipeReqCreator = async (cartProductsObject, transactionData) => {
   const purchase = cartProductsObject.cartProducts;
-  await fs.writeFile(purPath, JSON.stringify(purchase, null, 2));
-  await fs.writeFile(transDataPath, JSON.stringify(transactionData, null, 2));
+  // await fs.writeFile(purPath, JSON.stringify(purchase, null, 2));
+  // await fs.writeFile(transDataPath, JSON.stringify(transactionData, null, 2));
   try {
     const transactionDate = transactionData.params.date
       .split(".")

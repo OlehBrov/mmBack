@@ -1,68 +1,65 @@
 [
   {
-    "id": 52,
-    "product_name": "Борщ, 450г",
-    "product_code": "567",
-    "barcode": "2000000000145",
+    "id": 61,
+    "product_name": "Вафлі Світоч Артек класичні, 71г",
+    "product_code": "576",
+    "barcode": "8445290306623",
     "measure": "шт.",
     "product_name_ru": null,
-    "product_name_ua": "Борщ, 450г",
+    "product_name_ua": "Вафлі Світоч Артек класичні, 71г",
     "product_description": null,
-    "good_category": "Другі страви",
-    "product_category": 2,
-    "product_subcategory": 4,
-    "product_left": "10",
-    "product_image": "img/dinner.webp",
-    "product_price": "53.5",
+    "good_category": "Вафлі",
+    "product_category_old": 3,
+    "product_subcategory_old": 18,
+    "product_left": "3",
+    "product_image": "img/conditer.webp",
+    "product_price": "3.97",
     "product_discount": null,
     "product_rating": null,
-    "product_lot": 11,
+    "product_lot": 15,
     "exposition_term": null,
-    "sale_id": 7,
+    "sale_id": 4,
     "discount_price_1": null,
     "discount_price_2": null,
     "discount_price_3": null,
-    "updatedAt": "2024-11-08T15:50:31.480Z",
-    "combo_id": 11,
+    "updatedAt": "2024-11-22T10:44:19.733Z",
+    "combo_id": null,
+    "product_category": 16,
+    "product_subcategory": 41,
     "Categories": {
-      "id": 2,
-      "category_name": "Готові обіди",
+      "id": 3,
+      "category_name": "Кондитерські вироби",
       "category_discount": null,
-      "category_image": "img/icons/dinners.webp"
+      "category_image": "img/icons/conditier.webp",
+      "cat_1C_id": 16
     },
     "Subcategories": {
-      "id": 4,
-      "subcategory_name": "Другі страви",
-      "category_ref": 2,
-      "subcategory_discount": null
+      "id": 18,
+      "subcategory_name": "Вафлі",
+      "category_ref": 3,
+      "subcategory_discount": null,
+      "subcat_1C_id": 41,
+      "category_ref_1C": 16
     },
     "Sales": {
-      "id": 7,
-      "sale_name": "комбо",
-      "sale_discount_1": "0.1",
+      "id": 4,
+      "sale_name": "знижка",
+      "sale_discount_1": "0.2",
       "sale_discount_2": null,
       "sale_discount_3": null,
-      "sale_description": "Акція для парних товарів",
-      "sale_custom_id": 7
+      "sale_description": "Для товарів, що довго продаються",
+      "sale_custom_id": 4
     },
     "LoadProducts_LoadProducts_product_idToProducts": [
       {
         "load_date": "2024-03-01T00:00:00.000Z"
       }
     ],
-    "ComboProducts_Products_combo_idToComboProducts": {
-      "main_product_id": 52,
-      "child_product_id": 37,
-      "combo_id": 11,
-      "isActive": true,
-      "Products_ComboProducts_child_product_idToProducts": {
-        "product_left": "0"
-      }
-    },
+    "ComboProducts_Products_combo_idToComboProducts": null,
     "inCartQuantity": 1,
-    "priceDecrement": 0,
-    "priceAfterDiscount": "53.5",
-    "hasLowerPrice": false,
-    "dateTime": "2024-11-12 16:47:14:2840"
+    "priceDecrement": "0.79",
+    "priceAfterDiscount": "3.18",
+    "hasLowerPrice": true,
+    "dateTime": "2024-11-22 10:46:17:2240"
   }
 ]

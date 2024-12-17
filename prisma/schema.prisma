@@ -14,6 +14,7 @@ model Categories {
   category_image                                          String?         @db.VarChar(100)
   cat_1C_id                                               Int             @unique(map: "Categories_UNIQUE")
   Products                                                Products[]
+  Store                                                   Store[]
   Subcategories                                           Subcategories[]
   Subcategories_Subcategories_category_ref_1CToCategories Subcategories[] @relation("Subcategories_category_ref_1CToCategories")
 }
@@ -41,9 +42,10 @@ model LoadProducts {
   load_date                                   DateTime?        @db.Date
   load_quantity                               Decimal?         @db.Decimal(10, 2)
   lotIsActive                                 Boolean?         @default(false, map: "DF__LoadProdu__lotIs__7F80E8EA")
-  products_left                               Decimal?         @db.Decimal(10, 2)
+  products_left                               Float?
   sale_id                                     Int?             @default(0, map: "DF__LoadProdu__sale___76818E95")
   child_product_barcode                       String?          @db.VarChar(256)
+  load_date_time                              DateTime?
   Products_LoadProducts_product_idToProducts  Products?        @relation("LoadProducts_product_idToProducts", fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "LoadProducts_Products_FK")
   Sales                                       Sales?           @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "LoadProducts_Sales_FK")
   Products_Products_product_lotToLoadProducts Products[]       @relation("Products_product_lotToLoadProducts")
@@ -62,7 +64,7 @@ model Products {
   good_category                                          String?          @db.VarChar(256)
   product_category_old                                   Int?
   product_subcategory_old                                Int?
-  product_left                                           Decimal?         @default(0, map: "DF__Products__produc__65F62111") @db.Decimal(10, 2)
+  product_left                                           Decimal?         @db.Decimal(10, 2)
   product_image                                          String?          @db.VarChar(255)
   product_price                                          Decimal?         @db.Decimal(10, 2)
   product_discount                                       Decimal?         @db.Decimal(10, 2)
@@ -137,12 +139,19 @@ model Sales {
 }
 
 model Store {
-  id         Int     @id(map: "Store_PK") @default(autoincrement())
-  auth_id    String  @unique(map: "Store_UNIQUE") @db.VarChar(50)
-  store_name String? @db.VarChar(100)
-  password   String? @db.VarChar(200)
-  token      String? @db.VarChar(200)
-  role       String? @db.VarChar(100)
+  id                             Int            @id(map: "Store_PK") @default(autoincrement())
+  auth_id                        String         @unique(map: "Store_UNIQUE") @db.VarChar(50)
+  store_name                     String?        @db.VarChar(100)
+  password                       String?        @db.VarChar(200)
+  token                          String?        @db.VarChar(200)
+  role                           String?        @db.VarChar(100)
+  store_sale_name                String?        @db.NVarChar(100)
+  store_sale_title               String?        @db.NVarChar(100)
+  store_sale_discount            Decimal?       @db.Decimal(10, 2)
+  store_sale_product_category    Int?
+  store_sale_product_subcategory Int?
+  Categories                     Categories?    @relation(fields: [store_sale_product_category], references: [cat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Store_Categories_FK")
+  Subcategories                  Subcategories? @relation(fields: [store_sale_product_subcategory], references: [subcat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Store_Subcategories_FK")
 }
 
 model Subcategories {
@@ -153,6 +162,7 @@ model Subcategories {
   subcat_1C_id                                         Int?       @unique(map: "Subcategories_UNIQUE")
   category_ref_1C                                      Int
   Products                                             Products[]
+  Store                                                Store[]
   Categories                                           Categories @relation(fields: [category_ref], references: [id], onUpdate: NoAction, map: "Subcategories_Categories_FK")
   Categories_Subcategories_category_ref_1CToCategories Categories @relation("Subcategories_category_ref_1CToCategories", fields: [category_ref_1C], references: [cat_1C_id], onUpdate: NoAction, map: "Subcategories_Categories_FK_by_1C")
 }

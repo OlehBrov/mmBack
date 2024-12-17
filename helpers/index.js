@@ -6,6 +6,9 @@ const preparePurchase = require("./preparePurchase");
 const { initBuffer, saveBuffer } = require("./unsentFiscalHandler");
 const withResolvers = require("./withResolvers");
 const purchaseDbHandler = require('./purchaseDbHandler');
+const updateProductLoadLots = require('./updateProductLoadLots');
+// const saveTempProductData = require("./saveTempProductDataToDB")
+
 
 module.exports = {
   ctrlWrapper,
@@ -16,5 +19,7 @@ module.exports = {
   initBuffer,
   saveBuffer,
   withResolvers,
-  purchaseDbHandler
+  purchaseDbHandler,
+  updateProductLoadLots,
+  // saveTempProductData
 };

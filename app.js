@@ -10,6 +10,8 @@ const storeAuthRouter = require("./routes/storeAuthRoutes");
 const adminManageRouter = require("./routes/adminManageRoutes");
 const salesRouter = require('./routes/salesRoutes')
 const proxyRecieptRouter = require('./routes/proxyRecieptRoutes')
+const configRouter = require('./routes/configRoutes')
+const financeRouter = require('./routes/financeRouter')
 const imagesDir = process.env.IMAGE_DIR;
 const app = express();
 
@@ -26,6 +28,9 @@ app.use("/api/cart", cartRouter);
 app.use("api/sales", salesRouter)
 app.use("/api/reciept-proxy", proxyRecieptRouter)
 app.use("/api/product-image", express.static(imagesDir))
+app.use("/api/config", configRouter)
+app.use("/api/finance", financeRouter)
+
 
 app.use((err, req, res, next) => {
   console.log('error in app.use', err)

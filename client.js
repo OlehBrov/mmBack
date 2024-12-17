@@ -2,9 +2,12 @@ const net = require("net");
 const { CLIENT_HOST, CLIENT_PORT } = process.env;
 // const { disconnectDB } = require("./config/connectDB");
 const EventEmitter = require("events");
+const { wsServer } = require("./socket/heartbeat");
+
 const eventEmitter = new EventEmitter();
 
 let accumulatedBuffer = Buffer.alloc(0);
+
 let cancelRequested = false;
 const forPing = {
   method: "PingDevice",
@@ -25,7 +28,8 @@ const interruptMsg = {
   },
 };
 let payTimer = null;
-
+let terminalStatus = "offline";
+let pingInterval = null;
 let resolvePurchase = () => {};
 let rejectPurchase = () => {};
 
@@ -49,22 +53,28 @@ const client = net.createConnection(
   }
 );
 client.on("connect", () => {
-  console.log('client on connect')
-   sendHandshake(forPing);
-    sendHandshake(forIdentify);
-})
+  console.log("client on connect");
+  sendHandshake(forPing);
+  sendHandshake(forIdentify);
+  pingTerminal();
+});
 // Step 3: Handle the disconnect event
 client.on("close", (had_error) => {
   if (had_error) {
     console.log("Connection closed due to an error.");
+    terminalStatus = "offline";
+    broadcastTerminalStatus();
     reconnect();
   } else {
     console.log("Connection closed cleanly.");
+    terminalStatus = "offline";
+    broadcastTerminalStatus();
+    reconnect();
   }
 });
 
 client.on("data", (data) => {
-  console.log('client.on data accumulatedBuffer', accumulatedBuffer.length)
+  console.log("client.on data accumulatedBuffer", accumulatedBuffer.length);
   console.log("client.on data event", data.toString());
 
   accumulatedBuffer = Buffer.concat([accumulatedBuffer, data]);
@@ -115,6 +125,7 @@ function reconnect() {
   }
 }
 
+
 const sendHandshake = (msg) => {
   const messageString = JSON.stringify(msg);
   const messageWithDelimiters =
@@ -122,12 +133,49 @@ const sendHandshake = (msg) => {
       ? `\x00${messageString}\x00`
       : `${messageString}\x00`;
   const messageBuffer = Buffer.from(messageWithDelimiters, "utf8");
-  client.write(messageBuffer, (err) => {
-    if (err) {
-      console.error(`Failed to send ${msg.method} message:`, err);
-    } else {
-      console.log(`${msg.method} message sent successfully`);
-    }
+
+  return new Promise((resolve, reject) => {
+    let timeout = setTimeout(() => {
+      console.log("Terminal did not respond in time");
+      terminalStatus = "offline";
+      broadcastTerminalStatus(); // Notify front-end about offline status
+      reject(new Error("Timeout: No response from terminal"));
+    }, 5000); // Timeout in 5 seconds
+
+    client.write(messageBuffer, (err) => {
+      if (err) {
+        console.error(`Failed to send ${msg.method} message:`, err);
+        clearTimeout(timeout);
+        terminalStatus = "offline";
+        broadcastTerminalStatus();
+        reject(err);
+      }
+    });
+
+    client.once("data", (data) => {
+      clearTimeout(timeout);
+      console.log("client.once data", data.toString());
+
+      // console.log(`${msg.method} response received:`, data.toString());
+      try {
+        const response = data.toString();
+        if (!response.error) {
+          terminalStatus = "online"; // Mark terminal as online
+          broadcastTerminalStatus(); // Notify front-end about online status
+          resolve(response);
+        } else {
+          console.error("Error in terminal response:", response.error);
+          terminalStatus = "offline";
+          broadcastTerminalStatus();
+          reject(new Error(response.error));
+        }
+      } catch (err) {
+        console.error("Error parsing terminal response:", err);
+        terminalStatus = "offline";
+        broadcastTerminalStatus();
+        reject(err);
+      }
+    });
   });
 };
 
@@ -200,6 +248,23 @@ const closeAll = async () => {
     process.exit(0);
   });
 };
+const broadcastTerminalStatus = () => {
+  wsServer.emit("terminal-status", { status: terminalStatus });
+};
+
+const pingTerminal = () => {
+  if (pingInterval) clearInterval(pingInterval);
+
+  pingInterval = setInterval(async () => {
+    try {
+      console.log("Sending Ping to terminal...");
+      await sendHandshake(forPing); // Use the ping message
+      console.log("Terminal is online");
+    } catch (err) {
+      console.error("Terminal is offline or not responding:", err.message);
+    }
+  }, 60000); // Ping every 60 seconds
+};
 
 module.exports = {
   writer,
@@ -207,4 +272,5 @@ module.exports = {
   interruptMsg,
   cancelRequested,
   eventEmitter,
+  sendHandshake
 };
