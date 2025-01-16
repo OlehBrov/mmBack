@@ -43,6 +43,10 @@ wsServer.on("connection", (socket) => {
     console.log("Front-end client disconnected");
     wsServer.removeAllListeners("connect");
   });
+  socket.on("admin-ping", () => {
+    socket.emit("admin-pong");
+    console.log('admin-pong sent')
+  })
   // socket.on("screen-status", (status) => {
   //   console.log("on status", status);
   // });

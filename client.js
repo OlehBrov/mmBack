@@ -9,6 +9,8 @@ const eventEmitter = new EventEmitter();
 let accumulatedBuffer = Buffer.alloc(0);
 
 let cancelRequested = false;
+let reconnectInterval = null;
+let isReconnecting = false;
 const forPing = {
   method: "PingDevice",
   step: 0,
@@ -27,7 +29,7 @@ const interruptMsg = {
     msgType: "interrupt",
   },
 };
-let payTimer = null;
+
 let terminalStatus = "offline";
 let pingInterval = null;
 let resolvePurchase = () => {};
@@ -89,9 +91,11 @@ client.on("data", (data) => {
 });
 
 client.on("error", (err) => {
-  console.error("TCP error:", err);
-  if (err.code === "ECONNRESET") {
-    reconnect();
+  console.error("TCP error:", err.message);
+  if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") {
+    terminalStatus = "offline";
+    broadcastTerminalStatus();
+    reconnect(); // Start reconnection attempts
   }
 });
 // }
@@ -113,18 +117,37 @@ const processMessage = (message) => {
     accumulatedBuffer = Buffer.alloc(0);
   }
 };
+
 function reconnect() {
-  if (!client.connecting) {
-    // Check if the client is already attempting to connect
-    console.log("Attempting to reconnect...");
-    client.connect(CLIENT_PORT, CLIENT_HOST, () => {
-      console.log("Reconnected to PAX A930");
-      // Reinitialize any necessary state or resend handshake
-      // sendHandshake(forPing);
-    });
-  }
+  if (isReconnecting) return;
+  isReconnecting = true;
+  console.log("Attempting to reconnect...");
+
+  reconnectInterval = setInterval(() => {
+    if (!client.connecting) {
+      // Check if the client is already attempting to connect
+     console.log("Trying to reconnect to the terminal...");
+      client.connect(CLIENT_PORT, CLIENT_HOST, () => {
+        console.log("Reconnected to PAX A930");
+        // Reinitialize any necessary state or resend handshake
+        // sendHandshake(forPing);
+        clearReconnection(); // Stop reconnection attempts
+
+        sendHandshake(forPing);
+        sendHandshake(forIdentify);
+        pingTerminal();
+      });
+    }
+  }, 30000);
 }
 
+function clearReconnection() {
+  if (reconnectInterval) {
+    clearInterval(reconnectInterval);
+    reconnectInterval = null;
+    isReconnecting = false;
+  }
+}
 
 const sendHandshake = (msg) => {
   const messageString = JSON.stringify(msg);
@@ -134,12 +157,19 @@ const sendHandshake = (msg) => {
       : `${messageString}\x00`;
   const messageBuffer = Buffer.from(messageWithDelimiters, "utf8");
 
-  return new Promise((resolve, reject) => {
-    let timeout = setTimeout(() => {
-      console.log("Terminal did not respond in time");
-      terminalStatus = "offline";
-      broadcastTerminalStatus(); // Notify front-end about offline status
-      reject(new Error("Timeout: No response from terminal"));
+  return new Promise((resolve) => {
+    let isResolved = false;
+    const timeout = setTimeout(() => {
+      if (!isResolved) {
+        console.log("Terminal did not respond in time");
+        terminalStatus = "offline";
+        broadcastTerminalStatus(); // Notify front-end about offline status
+        isResolved = true;
+        resolve({
+          success: false,
+          message: "Timeout: No response from terminal",
+        }); // Gracefully resolve with failure status
+      }
     }, 5000); // Timeout in 5 seconds
 
     client.write(messageBuffer, (err) => {
@@ -148,32 +178,50 @@ const sendHandshake = (msg) => {
         clearTimeout(timeout);
         terminalStatus = "offline";
         broadcastTerminalStatus();
-        reject(err);
+        if (!isResolved) {
+          isResolved = true;
+          resolve({
+            success: false,
+            message: `Error writing message: ${err.message}`,
+          }); // Gracefully resolve with error details
+        }
       }
     });
 
     client.once("data", (data) => {
-      clearTimeout(timeout);
-      console.log("client.once data", data.toString());
+      if (!isResolved) {
+        clearTimeout(timeout);
+        isResolved = true;
+        console.log("client.once data", data.toString());
 
-      // console.log(`${msg.method} response received:`, data.toString());
-      try {
-        const response = data.toString();
-        if (!response.error) {
-          terminalStatus = "online"; // Mark terminal as online
-          broadcastTerminalStatus(); // Notify front-end about online status
-          resolve(response);
-        } else {
-          console.error("Error in terminal response:", response.error);
+        // console.log(`${msg.method} response received:`, data.toString());
+        try {
+          const response = data.toString();
+          if (!response.error) {
+            terminalStatus = "online"; // Mark terminal as online
+            broadcastTerminalStatus(); // Notify front-end about online status
+            resolve({
+              success: true,
+              response,
+            });
+          } else {
+            console.error("Error in terminal response:", response.error);
+            terminalStatus = "offline";
+            broadcastTerminalStatus();
+            resolve({
+              success: false,
+              message: `Error in terminal response: ${response.error}`,
+            });
+          }
+        } catch (err) {
+          console.error("Error parsing terminal response:", err);
           terminalStatus = "offline";
           broadcastTerminalStatus();
-          reject(new Error(response.error));
+          resolve({
+            success: false,
+            message: "Invalid response format from terminal",
+          });
         }
-      } catch (err) {
-        console.error("Error parsing terminal response:", err);
-        terminalStatus = "offline";
-        broadcastTerminalStatus();
-        reject(err);
       }
     });
   });
@@ -272,5 +320,5 @@ module.exports = {
   interruptMsg,
   cancelRequested,
   eventEmitter,
-  sendHandshake
+  sendHandshake,
 };

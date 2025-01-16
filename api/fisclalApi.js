@@ -118,6 +118,10 @@ const retryFailedRequests = async () => {
           "Server reported an error, re-buffering data:",
           response.data
         );
+        console.error(
+          "error_extra.errors:",
+          response.data.error_extra.errors.fiscal
+        );
         buffer.unshift(entry); // Re-add the entry at the start if error
       } else {
         console.log("Successfully sent buffered data:", response.data);

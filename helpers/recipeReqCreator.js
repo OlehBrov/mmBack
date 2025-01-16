@@ -8,8 +8,13 @@ const transDataPath = path.join(
   "RCtransactionData.json"
 );
 
-const recipeReqCreator = async (cartProductsObject, transactionData) => {
+const recipeReqCreator = async (
+  cartProductsObject,
+  transactionData,
+  taxGroup
+) => {
   const purchase = cartProductsObject.cartProducts;
+  console.log("recipeReqCreator purchase", purchase);
   // await fs.writeFile(purPath, JSON.stringify(purchase, null, 2));
   // await fs.writeFile(transDataPath, JSON.stringify(transactionData, null, 2));
   try {
@@ -21,7 +26,7 @@ const recipeReqCreator = async (cartProductsObject, transactionData) => {
     const dt = transactionDate.concat(transactionTime);
     const prodRows = purchase.map((prod) => {
       const prPerRow = prod.product_price * prod.inCartQuantity;
-      const discountPerRow = prod.priceDecrement * prod.inCartQuantity
+      const discountPerRow = prod.priceDecrement * prod.inCartQuantity;
       return {
         code: prod.article || "0", //Артикул товару
         code1: prod.barcode || "0", // ШК товару
@@ -31,10 +36,11 @@ const recipeReqCreator = async (cartProductsObject, transactionData) => {
         price: parseFloat(prod.product_price),
         disc: parseFloat(discountPerRow.toFixed(2)), //Знижка на рядок чеку
         cost: parseFloat(prPerRow.toFixed(2)), //Сума по рядку до знижки
-        taxgrp: 7, //Код податкової групи
+        taxgrp: taxGroup, //Код податкової групи
       };
     });
-
+    console.log('taxGroup', taxGroup)
+    console.log("prodRows recipeReqCreator", prodRows);
     return {
       dt: dt,
       tag: "",

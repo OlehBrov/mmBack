@@ -7,6 +7,7 @@ const purchaseDbHandler = async (cartProductsObject, bankResponse) => {
   const products = cartProductsObject.cartProducts;
   console.log("purchaseDbHandler products", products);
   const removeProductsData = products.map((product) => {
+    console.log('removeProductsData product', product)
     const [day, month, year] = params.date.split(".");
     const isoDate = `${year}-${month}-${day}`;
     const isoDateTime = `${isoDate}T${params.time}`;
@@ -33,15 +34,17 @@ const purchaseDbHandler = async (cartProductsObject, bankResponse) => {
       bankAcquirer: params.bankAcquirer,
       paymentSystem: params.paymentSystem,
       subMerchant: params.subMerchant,
+      product_sale_id: product.sale_id,
     };
   });
-  await prisma.RemoveProducts.createMany({
-    data: removeProductsData,
-  });
-
-  const updateProducts = async () => {
+    //Enable in production
+  // await prisma.RemoveProducts.createMany({
+  //   data: removeProductsData,
+  // });
+console.log('removeProductsData', removeProductsData)
+  const updateProducts = async (productsToUpdate) => {
     await prisma.$transaction(async (tx) => {
-      for (const product of removeProductsData) {
+      for (const product of productsToUpdate) {
         await prisma.LoadProducts.update({
           where: {
             id: product.load_id,
@@ -81,8 +84,8 @@ const purchaseDbHandler = async (cartProductsObject, bankResponse) => {
 
     // }
   };
-
-  await updateProducts();
+  //Enable in production
+  // await updateProducts(removeProductsData);
 };
 
 module.exports = purchaseDbHandler;

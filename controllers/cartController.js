@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs/promises");
+const { prisma } = require("../config/db/dbConfig");
 const {
   ctrlWrapper,
   recipeReqCreator,
@@ -15,18 +16,20 @@ const { writer, setupPurchaseHandlers, interruptMsg } = require("../client");
 const saleCheck = require("../api/fisclalApi");
 const fakePurchaseProducts = require("../data/recipeRCpurchase.json");
 const fakeBankResponse = require("../data/fakeTerminalResponse.json");
-
+const { STORE_AUTH_ID } = process.env;
 let cancelRequested = require("../client");
 
 const { eventEmitter } = require("../client");
 
 const Promise = require("bluebird");
+const { wsServer } = require("../socket/heartbeat");
+const { stat } = require("fs");
 
 Promise.config({
   cancellation: true,
 });
 
-const createFakeTerminalResponce = async (purchData) => {
+const createFakeTerminalResponce = async (purchData, key) => {
   const dateObj = new Date();
   const date = dateObj.getDate().toString().padStart(2, "0");
   const month = dateObj.getMonth();
@@ -43,28 +46,33 @@ const createFakeTerminalResponce = async (purchData) => {
       amount: purchData.params.amount,
       date: `${date}.${corMonth}.${year}`,
       time: `${hours}:${minutes}:${seconds}`,
+      merchantId: purchData.params.merchantId,
     },
     error: false,
     errorDescription: "",
   };
-
-  // const resp = {
-  //   ...fakeBankResponse,
-  //   params: {
-  //     ...fakeBankResponse.params, // Spread the existing `params` object
-  //     amount: purchData.params.amount,
-  //     date: `${date}.${corMonth}.${year}`,
-  //     time: `${hours}:${minutes}:${seconds}`,
-  //   },
-  //   error: true,
-  //   errorDescription: "Canceled",
-  // };
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(resp);
-    }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
-  });
+  const respError = {
+    method: "Purchase",
+    step: 0,
+    params: {
+      responseCode: 1001,
+    },
+    error: true,
+    errorDescription: "Transaction canceled by user",
+  };
+  if (!key) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(respError);
+      }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
+    });
+  } else {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(resp);
+      }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
+    });
+  }
 };
 
 const productsSell = async (req, res) => {
@@ -75,57 +83,189 @@ const productsSell = async (req, res) => {
       description: "No products to buy",
     });
   }
-
+  // console.log("req.body", req.body);
+  // const storeId = req.body.store_id;
   const purchaseProducts = req.body;
-  console.log("purchaseProducts", purchaseProducts);
-  const purchase = preparePurchase(purchaseProducts);
+  console.log("productsSell purchaseProducts", purchaseProducts);
+  const store = await prisma.Store.findFirst({
+    where: { auth_id: STORE_AUTH_ID },
+  });
+  const withVATProducts = {
+    ...purchaseProducts,
+    cartProducts: [],
+  };
+  const noVATProducts = {
+    ...purchaseProducts,
+    cartProducts: [],
+  };
+  for (const product of purchaseProducts.cartProducts) {
+    console.log('purchaseProducts.cartProducts product', product)
+    if (product.merchant === "both") {
+      if (product.is_VAT_Excise) {
+        console.log('merchant === "both" product.is_VAT_Excise', product)
+        withVATProducts.cartProducts.push(product);
+      } else {
+        noVATProducts.cartProducts.push(product);
+      }
+    } else if (product.merchant === "VAT") {
+      withVATProducts.cartProducts.push(product);
+    } else {
+      // if (product.merchant === "noVAT")
+      noVATProducts.cartProducts.push(product);
+    }
+  }
 
-  if (!purchase) {
+  console.log("withVATProducts", withVATProducts);
+  console.log("noVATProducts", noVATProducts);
+  if (
+    !withVATProducts.cartProducts.length &&
+    !noVATProducts.cartProducts.length
+  ) {
+    return res.status(400).json({
+      message: "Failed to process the purchase",
+      description: "No products to buy",
+    });
+  }
+
+  let purchaseNoVAT, purchaseWithVAT;
+
+  if (noVATProducts.cartProducts.length) {
+    purchaseNoVAT = preparePurchase(
+      noVATProducts,
+      store.default_merchant,
+      "noVat"
+    );
+  }
+
+  if (withVATProducts.cartProducts.length && store.VAT_excise_merchant) {
+    purchaseWithVAT = preparePurchase(
+      withVATProducts,
+      store.VAT_excise_merchant,
+      "vat"
+    );
+  }
+
+  if (!purchaseNoVAT && !purchaseWithVAT) {
     return res.status(400).json({
       message: "Failed to process the purchase",
       description: "Invalid sum",
     });
   }
-  console.log("purchase 1", purchase);
+
+  // if (!purchase) {
+  //   return res.status(400).json({
+  //     message: "Failed to process the purchase",
+  //     description: "Invalid sum",
+  //   });
+  // }
+  // console.log("purchase 1", purchase);
   /*
 to terminal
 */
-  const {
-    promise: transactionPromise,
-    resolve,
-    reject,
-    cancel,
-  } = withResolvers();
-  setupPurchaseHandlers(resolve, reject);
+  // const {
+  //   promise: transactionPromise,
+  //   resolve,
+  //   reject,
+  //   cancel,
+  // } = withResolvers();
+  // setupPurchaseHandlers(resolve, reject);
 
-  try {
-     writer(purchase).catch(reject);
-    eventEmitter.once("cancelPurchase", () => {
-      console.log("Cancellation success requested");
-      cancel({
-        error: true,
-        errorDescription: "Purchase cancelled by user",
-      });
+  eventEmitter.once("cancelPurchase", () => {
+    console.log("Cancellation success requested");
+    cancel({
+      error: true,
+      errorDescription: "Purchase cancelled by user",
     });
-    //Fake response
-    // const response = await createFakeTerminalResponce(purchase);
+  });
 
-    const response = await transactionPromise;
-    console.log("Transaction completed:", response);
-
-    if (response.error) {
-      // throw new Error(response.errorDescription);
-      return res
-        .status(403)
-        .json({ errorDescription: response.errorDescription });
+  // const response = await createFakeTerminalResponce(purchase);
+  try {
+    let responseNoVAT, responseWithVAT;
+    if (
+      withVATProducts.cartProducts.length &&
+      noVATProducts.cartProducts.length
+    ) {
+      wsServer.emit("twoPurchases");
     }
-    if (!response.error && response.method === "Purchase") {
-      purchaseDbHandler(purchaseProducts, response);
-    }
-    const fiscalData = await recipeReqCreator(purchaseProducts, response);
-    const fiscalResponse = await saleCheck(fiscalData);
+    const fiscalData = {
+      noVAT: null,
+      withVAT: null,
+    };
+    const fiscalResponse = {
+      fiscalNoVAT: null,
+      fiscalWithVAT: null,
+    };
+    if (purchaseNoVAT) {
+      // await writer(purchaseNoVAT).catch(reject);
+      // responseNoVAT = await transactionPromise;
+      console.log("purchaseNoVAT", purchaseNoVAT);
+      responseNoVAT = await createFakeTerminalResponce(purchaseNoVAT, true);
 
-    res.status(200).send(fiscalResponse);
+      if (responseNoVAT.error) {
+        console.log("responseNoVAT.error", responseNoVAT.error);
+        return res
+          .status(403)
+          .json({ errorDescription: responseNoVAT.errorDescription });
+      }
+      fiscalData.noVAT = await recipeReqCreator(
+        noVATProducts,
+        responseNoVAT,
+        store.default_merchant_taxgrp
+      );
+      fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData.noVAT);
+      console.log("fiscalData.noVAT", fiscalData.noVAT);
+      if (!responseNoVAT.error && responseNoVAT.method === "Purchase") {
+        await purchaseDbHandler(purchaseProducts, responseNoVAT);
+      }
+    }
+
+    if (purchaseWithVAT) {
+      if (purchaseNoVAT) {
+        wsServer.emit("secondPayment");
+      }
+      // await writer(purchaseWithVAT).catch(reject);
+      // responseWithVAT = await transactionPromise;
+      console.log("purchaseWithVAT", purchaseWithVAT);
+      responseWithVAT = await createFakeTerminalResponce(
+        purchaseWithVAT,
+        true
+      );
+      console.log("responseWithVAT", responseWithVAT);
+      if (responseWithVAT.error) {
+        console.log(
+          "Error in purchaseWithVAT:",
+          responseWithVAT.errorDescription
+        );
+        return res.status(200).json({
+          status: "part-success",
+          fiscalResponse: {
+            fiscalNoVAT: fiscalResponse.fiscalNoVAT,
+          },
+          error: {
+            target: "withVATProducts",
+            description: responseWithVAT.errorDescription,
+          },
+        });
+      }
+      fiscalData.withVAT = await recipeReqCreator(
+        withVATProducts,
+        responseWithVAT,
+        store.VAT_merchant_taxgrp
+      );
+      console.log("fiscalData.withVAT", fiscalData.withVAT);
+      fiscalResponse.fiscalWithVAT = await saleCheck(fiscalData.withVAT);
+
+      if (!responseWithVAT.error && responseWithVAT.method === "Purchase") {
+        await purchaseDbHandler(purchaseProducts, responseWithVAT);
+      }
+    }
+
+    //fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData);
+    console.log("fiscalResponse", fiscalResponse);
+    res.status(200).send({
+      status: "success",
+      fiscalResponse,
+    });
   } catch (error) {
     // Handle promise rejection due to cancellation or other errors
     if (
@@ -139,85 +279,6 @@ to terminal
   }
 };
 
-// const productsSell = async (req, res) => {
-//   if (!req.body || !req.body.length) {
-//     res.status(400).json({
-//       message: "Failed to process the purchase",
-//       description: "No products to buy",
-//     });
-//     return; // Return here to stop further execution
-//   }
-//   const purchaseProducts = req.body;
-
-//   const purchase = preparePurchase(purchaseProducts);
-//   console.log("purchase", purchase);
-//   if (!purchase) {
-//     // Check if purchase preparation failed
-//     return res.status(400).json({
-//       message: "Failed to process the purchase",
-//       description: "Invalid sum",
-//     });
-//   }
-//   try {
-//     const response = await new Promise((resolve, reject) => {
-//       setupPurchaseHandlers(resolve, reject); // Pass resolve and reject to setup handlers
-//       writer(purchase).catch(reject); // Call writer and pass reject to handle errors
-//     });
-//     console.log("productsSell response", response);
-//     if (response.error) {
-//       res.status(400).json({
-//         message: "Failed to process the purchase",
-//         description: response.errorDescription,
-//       });
-//       return; // Return here to stop further execution
-//     }
-//     //   // const fiscalData = await recipeReqCreator(purchaseProducts, response);
-
-//     //   const fiscalData = await recipeReqCreator(
-//     //     fakePurchaseProducts,
-//     //     fakeBankResponse
-//     //   );
-//     //  if (!fiscalData) {
-//     //     return res.status(400).json({
-//     //       message: "Failed to process the purchase",
-//     //       description: "Invalid recipe create",
-//     //     });
-//     //   }
-//     //   await fs.writeFile(fiscalDataPath, JSON.stringify(fiscalData, null, 2)); // For debug
-
-//     //   const fiscalResponse = await saleCheck(fiscalData);
-//     //   console.log("fiscalResponse", fiscalResponse);
-//     //   await fs.writeFile(fiscalPath, JSON.stringify(fiscalResponse, null, 2)); // For debug
-//     //   setTimeout(() => {
-//     //     res.status(200).send(fiscalResponse);
-//     //   }, 5000);
-//   } catch (error) {
-//     console.log("error in productsSell catch", error);
-//     res.status(400).json({
-//       message: "Failed to process the purchase",
-//       description: error.response.errorDescription,
-//     });
-//   }
-//   finalizeTransaction()
-// };
-// const cancelSell = async (req, res, next) => {
-//   cancelRequested = true;
-//   const response = await new Promise((resolve, reject) => {
-//     setupPurchaseHandlers(resolve, reject); // Pass resolve and reject to setup handlers
-//     writer(interruptMsg).catch(reject); // Call writer and pass reject to handle errors
-//   });
-//   console.log("response cancelSell", response);
-//   if (response.error) {
-//     res.status(400).json({
-//       message: "Failed to process the purchase",
-//       description: response.errorDescription,
-//     });
-//     return; // Return here to stop further execution
-//   }
-//   res.status(200).json({
-//     message: "Оплата відмінена  покупцем",
-//   });
-// };
 const cancelSell = async (req, res) => {
   cancelRequested = true; // Set cancellation flag
   const response = await new Promise((resolve, reject) => {

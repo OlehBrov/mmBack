@@ -60,7 +60,12 @@ const saveImage = async (req, res) => {
           message: "Bad file name, should be barcode and extension",
         });
       }
-
+      const productInDb = await prisma.Products.findUnique({
+        where: {
+          barcode: barcode,
+        },
+      });
+      if(productInDb){
       await prisma.Products.update({
         where: {
           barcode: barcode,
@@ -68,14 +73,13 @@ const saveImage = async (req, res) => {
         data: {
           product_image: `${MM_HOST}/api/product-image/${fileName}`,
         },
-      });
+      });}
     }
 
     wsServer.emit("product-updated");
 
     res.send({
-      message: "File uploaded successfully",
-      filename: fileName,
+      message: "File(s) uploaded successfully",
     });
     // res.status(200).json({ message: "Images uploaded successfully!" });
   } catch (error) {

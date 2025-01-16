@@ -1,7 +1,6 @@
 const updateProductLoadLots = (withdrawProduct, loadLots) => {
-  console.log("updateProductLoadLots invoke");
-  console.log("withdrawProduct", withdrawProduct);
-  //   console.log("loadLots", loadLots);
+
+
   if (withdrawProduct.decrement === "all" && withdrawProduct.limit === "") {
     return clearAllLots(loadLots);
   }
@@ -13,7 +12,7 @@ const updateProductLoadLots = (withdrawProduct, loadLots) => {
     return clearAllExceptLast(loadLots);
   }
   let remainingQuantity = parseFloat(withdrawProduct.decrement);
-  console.log("remainingQuantity", remainingQuantity);
+
   const modifiedLots = [];
 
   for (const lot of loadLots) {
@@ -25,12 +24,7 @@ const updateProductLoadLots = (withdrawProduct, loadLots) => {
 
       lot.products_left -= decrementAmount;
       remainingQuantity -= decrementAmount;
-      //   console.log(
-      //     "lot.products_left -= decrementAmount;",
-      //     (lot.products_left -= decrementAmount)
-      //   );
-      //   console.log("lot.products_left ", lot.products_left);
-      //   console.log("decrementAmount;", decrementAmount);
+
       if (lot.products_left === 0) {
         lot.lotIsActive = 0; // Deactivate lot if all products are decremented
       }
@@ -40,34 +34,35 @@ const updateProductLoadLots = (withdrawProduct, loadLots) => {
         ...lot,
         originalProductsLeft,
         decrementAmount,
+        withdrawQuantity: decrementAmount,
       });
     }
   }
-  console.log("modifiedLots", modifiedLots);
+
   return modifiedLots;
 };
 
 const clearAllLots = (lots) => {
+  if (!Array.isArray(lots) || lots.length === 0) return [];
   return lots.map((lot) => {
     return {
       ...lot,
       products_left: 0,
       lotIsActive: 0,
+      withdrawQuantity: lot.products_left,
     };
   });
 };
 
 const clearAllExceptLast = (lots) => {
-  const lastLot = lots.slice(-1);
-  const lastCutlots = lots.slice(0, -1);
-  const modified = lastCutlots.map((lot) => {
-    return {
-      ...lot,
-      products_left: 0,
-      lotIsActive: 0,
-    };
-  });
+  if (!Array.isArray(lots) || lots.length < 1) return [];
+  const modifiedLots = lots.slice(0, -1).map((lot) => ({
+    ...lot,
+    products_left: 0,
+    lotIsActive: 0,
+    withdrawQuantity: lot.products_left,
+  }));
 
-  return [...modified, ...lastLot];
+  return [...modifiedLots];
 };
 module.exports = updateProductLoadLots;

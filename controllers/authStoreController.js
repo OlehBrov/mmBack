@@ -39,7 +39,7 @@ const refreshToken = async (req, res, next) => {
     const token = jwt.sign(
       { auth_id: prismaStore.auth_id, store_id: prismaStore.store_id },
       AUTH_TOKEN_SECRET_KEY,
-      { expiresIn: "1m" }
+      { expiresIn: "24h" }
     );
 
     // Update the store with the new token
@@ -82,13 +82,13 @@ const logInStore = async (req, res, next) => {
     { auth_id: store.auth_id, store_id: store.id },
     AUTH_TOKEN_SECRET_KEY,
     {
-      expiresIn: "1m",
+      expiresIn: "24h",
     }
   );
   const refreshToken = jwt.sign(
     { auth_id: store.auth_id, store_id: store.id },
     REFRESH_TOKEN_SECRET_KEY,
-    { expiresIn: "1d" }
+    { expiresIn: "24h" }
   );
   const updateStore = await prisma.Store.update({
     where: {

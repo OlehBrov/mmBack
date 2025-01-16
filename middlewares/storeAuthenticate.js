@@ -8,17 +8,17 @@ const { prisma } = require("../config/db/dbConfig");
 const { AUTH_TOKEN_SECRET_KEY } = process.env;
 
 const storeAuthenticate = async (req, res, next) => {
-  console.log('storeAuthenticate invoke')
+  console.log("storeAuthenticate invoke");
   const { authorization = "" } = req.headers;
 
   const [bearer, token] = authorization.split(" ");
-console.log('storeAuthenticate token', token)
+  console.log("storeAuthenticate token", token);
   if (bearer !== "Bearer" && !token) {
     next(httpError(401, "Not authorized"));
   }
   try {
     const { auth_id } = jwt.verify(token, AUTH_TOKEN_SECRET_KEY);
-    console.log('auth_id', auth_id)
+    console.log("auth_id", auth_id);
     const prismaStore = await prisma.Store.findUnique({
       where: {
         auth_id: auth_id,
