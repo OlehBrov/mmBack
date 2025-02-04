@@ -56,15 +56,12 @@ model LoadProducts {
 model Products {
   id                                                     Int              @id(map: "Products_PK") @default(autoincrement())
   product_name                                           String?          @db.VarChar(256)
-  product_code                                           String?          @db.VarChar(256)
+  product_code                                           String?          @unique(map: "Products_UNIQUE_prod_code") @db.VarChar(256)
   barcode                                                String?          @unique(map: "Products_UNIQUE") @db.VarChar(256)
   measure                                                String?          @db.VarChar(64)
   product_name_ru                                        String?          @db.VarChar(256)
   product_name_ua                                        String?          @db.VarChar(256)
   product_description                                    String?          @db.VarChar(256)
-  good_category                                          String?          @db.VarChar(256)
-  product_category_old                                   Int?
-  product_subcategory_old                                Int?
   product_left                                           Decimal?         @db.Decimal(10, 2)
   product_image                                          String?          @db.VarChar(255)
   product_price                                          Decimal?         @db.Decimal(10, 2)
@@ -85,6 +82,7 @@ model Products {
   VAT_value                                              Decimal?         @db.Decimal(10, 2)
   excise_value                                           Decimal?         @db.Decimal(10, 2)
   excise_product                                         Boolean?
+  taxgrp                                                 Int?
   ComboProducts_ComboProducts_main_product_idToProducts  ComboProducts[]  @relation("ComboProducts_main_product_idToProducts")
   ComboProducts_ComboProducts_child_product_idToProducts ComboProducts[]  @relation("ComboProducts_child_product_idToProducts")
   Inventory                                              Inventory?
@@ -99,33 +97,48 @@ model Products {
 }
 
 model RemoveProducts {
-  id                           Int           @id(map: "RemoveProducts_PK") @default(autoincrement())
-  product_id                   Int?
-  remove_date                  DateTime?     @db.DateTime
-  remove_quantity              Decimal?      @db.Decimal(10, 2)
-  remove_type_id               Int?
-  remove_cost                  Decimal?      @db.Decimal(10, 2)
-  isActive                     Boolean?      @default(false, map: "DF__RemovePro__isAct__0E04126B")
-  load_id                      Int?
-  amount                       Decimal?      @db.Decimal(8, 2)
-  approvalCode                 String?       @db.VarChar(100)
-  bankAcquirer                 String?       @db.VarChar(100)
-  date                         String?       @db.NVarChar(64)
-  discount                     Decimal?      @db.Decimal(8, 2)
-  method                       String?       @db.VarChar(64)
-  pan                          String?       @db.VarChar(64)
-  paymentSystem                String?       @db.VarChar(100)
-  responseCode                 String?       @db.VarChar(64)
-  rrn                          String?       @db.VarChar(100)
-  rrnExt                       String?       @db.VarChar(100)
-  subMerchant                  String?       @db.VarChar(100)
-  time                         String?       @db.NVarChar(64)
-  product_sale_id              Int?
-  combo_child_product_barcode  String?       @db.VarChar(100)
-  combo_parent_product_barcode String?       @db.VarChar(100)
-  LoadProducts                 LoadProducts? @relation(fields: [load_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_LoadProducts_FK")
-  Products                     Products?     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_Products_FK")
-  RemoveTypes                  RemoveTypes?  @relation(fields: [remove_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_RemoveTypes_FK")
+  id                              Int           @id(map: "RemoveProducts_PK") @default(autoincrement())
+  product_id                      Int?
+  remove_date                     DateTime?     @db.DateTime
+  remove_quantity                 Decimal?      @db.Decimal(10, 2)
+  remove_type_id                  Int?
+  remove_cost                     Decimal?      @db.Decimal(10, 2)
+  isActive                        Boolean?      @default(false, map: "DF__RemovePro__isAct__0E04126B")
+  load_id                         Int?
+  amount                          Decimal?      @db.Decimal(8, 2)
+  approvalCode                    String?       @db.VarChar(100)
+  bankAcquirer                    String?       @db.VarChar(100)
+  date                            String?       @db.NVarChar(64)
+  discount                        Decimal?      @db.Decimal(8, 2)
+  method                          String?       @db.VarChar(64)
+  pan                             String?       @db.VarChar(64)
+  paymentSystem                   String?       @db.VarChar(100)
+  responseCode                    String?       @db.VarChar(64)
+  rrn                             String?       @db.VarChar(100)
+  rrnExt                          String?       @db.VarChar(100)
+  subMerchant                     String?       @db.VarChar(100)
+  time                            String?       @db.NVarChar(64)
+  product_sale_id                 Int?
+  combo_child_product_barcode     String?       @db.VarChar(100)
+  combo_parent_product_barcode    String?       @db.VarChar(100)
+  fisc_fiscal_number              String?       @db.VarChar(100)
+  fisc_company_name               String?       @db.VarChar(255)
+  fisc_company_edrpou             String?       @db.VarChar(100)
+  fisc_rro_fiscal_number          String?       @db.VarChar(100)
+  fisc_iso_date_created           DateTime?     @db.DateTime
+  fisc_check_url                  String?       @db.VarChar(256)
+  fics_target_url                 String?       @db.VarChar(256)
+  fisc_check_tax_name             String?       @db.VarChar(100)
+  fisc_check_tax_print            String?       @db.VarChar(100)
+  fisc_check_tax_percent          Float?
+  fisch_check_tax_sum             Float?
+  fisc_tax_additional_tax_caption String?       @db.VarChar(100)
+  fisc_additional_tax_percent     Float?
+  fisc_additional_tax_sum         Float?
+  internal_store_check_id         String?       @db.VarChar(100)
+  LoadProducts                    LoadProducts? @relation(fields: [load_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_LoadProducts_FK")
+  Products                        Products?     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_Products_FK")
+  RemoveTypes                     RemoveTypes?  @relation(fields: [remove_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "RemoveProducts_RemoveTypes_FK")
 }
 
 model RemoveTypes {
@@ -165,6 +178,10 @@ model Store {
   is_single_merchant             Boolean?
   default_merchant_taxgrp        Int?
   VAT_merchant_taxgrp            Int?
+  VAT_excise_taxgrp              Int?
+  default_merchant_name          String?        @db.NVarChar(100)
+  VAT_merchant_name              String?        @db.NVarChar(100)
+  store_address                  String?        @db.NVarChar(100)
   Categories                     Categories?    @relation(fields: [store_sale_product_category], references: [cat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Store_Categories_FK")
   Subcategories                  Subcategories? @relation(fields: [store_sale_product_subcategory], references: [subcat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Store_Subcategories_FK")
 }

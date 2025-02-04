@@ -5,28 +5,7 @@ const path = require("path");
 const { wsServer } = require("../socket/heartbeat");
 const { MM_HOST } = process.env;
 const imagesDir = process.env.IMAGE_DIR;
-// const saveImage = async (req, res) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).send("No file uploaded.");
-//     }
 
-//     await prisma.Products.update({
-//       where: {
-//         barcode: req.body.fileName,
-//       },
-//       data: {
-//         product_image: `${MM_HOST}/api/product-image/${req.file.filename}`,
-//       },
-//     });
-//     res.send({
-//       message: "File uploaded successfully",
-//       filename: req.file.filename,
-//     });
-//   } catch (error) {
-//     res.status(500).send("Error uploading file.");
-//   }
-// };
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
@@ -38,7 +17,7 @@ const saveImage = async (req, res) => {
   try {
     const imageData = req.body; // Expecting an array of objects
 
-    // const { productImage, fileName } = imageData;
+
     for (const imageDataItem of imageData) {
       const { productImage, fileName } = imageDataItem;
       if (!productImage || !fileName) {
@@ -81,7 +60,7 @@ const saveImage = async (req, res) => {
     res.send({
       message: "File(s) uploaded successfully",
     });
-    // res.status(200).json({ message: "Images uploaded successfully!" });
+
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message });

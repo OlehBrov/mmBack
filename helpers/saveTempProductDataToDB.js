@@ -161,12 +161,12 @@ const saveTempProductDataToDB = async () => {
             product_left: product.data.product_left || 0,
             Categories: {
               connect: {
-                cat_1C_id: product.data.product_category, // Use the foreign key here
+                cat_1C_id: product.data.product_category, 
               },
             },
             Subcategories: {
               connect: {
-                subcat_1C_id: product.data.product_subcategory, // Use the foreign key here
+                subcat_1C_id: product.data.product_subcategory,
               },
             },
             Sales: {

@@ -4,23 +4,47 @@ const addProductValidation = Joi.array().items(
   Joi.object({
     product_name: Joi.string()
       .trim()
-      .required('Field "Product name" should not be empty'),
+      .required('Field "product_name" should not be empty'),
     barcode: Joi.string()
       .trim()
       .required('Field "Barcode" should not be empty'),
-    image: Joi.string().trim().required('Field "Image" should not be empty'),
-    description: Joi.string()
-      .trim()
-      .required('Field "description" should not be empty'),
-    price: Joi.number().required('Field "Price" should not be empty'),
-    total: Joi.number().required('Field "Total" should not be empty'),
-    category: Joi.array().min(1).required("Add at least 1 category"),
+    product_code: Joi.string().trim().required('Field "product_code" should not be empty'),
+    measure: Joi.string().trim(),
+    product_name_ru: Joi.string().trim().allow(null),
+    product_name_ua: Joi.string().trim(),
+    product_description: Joi.string().trim().allow(null),
+    product_image: Joi.string().trim(),
+    product_discount: Joi.number().allow(null),
+    exposition_term: Joi.number().min(1).required( 'Field "exposition_term" should not be empty or 0'),
+    product_left: Joi.number().min(1).required(
+      'Field "product_left" should not be empty or 0'
+    ),
+    product_price: Joi.number().required(
+      'Field "product_price" should not be empty'
+    ),
+    product_category: Joi.number().required(
+      'Field "product_category" should not be empty'
+    ),
+    product_subcategory: Joi.number().required(
+      'Field "product_subcategory" should not be empty'
+    ),
+    sale_id: Joi.number().required('Field "sale_id" should not be empty'),
+    is_VAT_Excise: Joi.bool().required('Field "is_VAT_Excise" must be true or false'),
+    product_price_no_VAT: Joi.number().required(
+      'Field "product_price_no_VAT" should not be empty'
+    ),
+    VAT_value: Joi.number().required('Field "vat_value" should not be empty'),
+    excise_value: Joi.number().required(
+      'Field "excise_value" should not be empty'
+    ),
+    child_product_barcode: Joi.string().trim(),
+    excise_product: Joi.bool().required('Field "excise_product" should not be empty and only "true" or "false"')
   })
 );
 
 const updateProductValidation = Joi.array().items(
-    Joi.object({
-       product_id: Joi.number().required("No product_id provided"),
+  Joi.object({
+    product_id: Joi.number().required("No product_id provided"),
     product_name: Joi.string()
       .trim()
       .required('Field "Product name" should not be empty'),
@@ -38,13 +62,10 @@ const updateProductValidation = Joi.array().items(
 );
 
 const productSchema = Joi.object({
-  barcode: Joi.string()
-    .required()
-    .pattern(/^\d+$/)
-    .messages({
-      "string.empty": "Barcode is required.",
-      "string.pattern.base": "Barcode must contain only numbers.",
-    }),
+  barcode: Joi.string().required().pattern(/^\d+$/).messages({
+    "string.empty": "Barcode is required.",
+    "string.pattern.base": "Barcode must contain only numbers.",
+  }),
   data: Joi.object({
     product_name: Joi.string().allow(null, "").messages({
       "string.base": "Product name must be a string.",
@@ -131,5 +152,5 @@ const createNewProductsSchema = Joi.array().items(productSchema);
 module.exports = {
   addProductValidation,
   updateProductValidation,
-  createNewProductsSchema
+  createNewProductsSchema,
 };

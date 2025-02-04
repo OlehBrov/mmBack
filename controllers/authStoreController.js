@@ -65,9 +65,9 @@ const refreshToken = async (req, res, next) => {
 };
 
 const logInStore = async (req, res, next) => {
-  console.log("logInStore invoke");
+ 
   const { login, password } = req.body;
-  console.log("login", login);
+  
   const store = await prisma.Store.findUnique({ where: { auth_id: login } });
   if (!store) {
     return httpError(401);

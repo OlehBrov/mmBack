@@ -6,9 +6,10 @@ const adminAuthenticate = require("../middlewares/adminAuthenticate");
 
 const { bodyValidator } = require("../validation/validator");
 
-router.use(adminAuthenticate);
+// router.use(adminAuthenticate);
 router.get("/", adminManageController.getAllStores);
-router.get("/:id", adminManageController.getSingleStore);
+router.get("/config", adminManageController.getSingleStore);
+router.get("/withdraws", adminManageController.getWithdraws);
 router.post("/", adminManageController.putProductsInStore);
 router.post("/create", adminManageController.createStore);
 

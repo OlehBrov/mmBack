@@ -10,8 +10,7 @@ const transDataPath = path.join(
 
 const recipeReqCreator = async (
   cartProductsObject,
-  transactionData,
-  taxGroup
+  transactionData
 ) => {
   const purchase = cartProductsObject.cartProducts;
   console.log("recipeReqCreator purchase", purchase);
@@ -28,19 +27,32 @@ const recipeReqCreator = async (
       const prPerRow = prod.product_price * prod.inCartQuantity;
       const discountPerRow = prod.priceDecrement * prod.inCartQuantity;
       return {
-        code: prod.article || "0", //Артикул товару
-        code1: prod.barcode || "0", // ШК товару
+        code: prod.product_code , //Артикул товару
+        code1: prod.barcode , // ШК товару
         code_a: prod.mark || "0", //Код акцизної марки товару
         name: prod.product_name,
         cnt: prod.inCartQuantity, //Кількість товару (не більше 3х знаків після коми)
         price: parseFloat(prod.product_price),
         disc: parseFloat(discountPerRow.toFixed(2)), //Знижка на рядок чеку
         cost: parseFloat(prPerRow.toFixed(2)), //Сума по рядку до знижки
-        taxgrp: taxGroup, //Код податкової групи
+        taxgrp: prod.taxGroup, //Код податкової групи
       };
     });
-    console.log('taxGroup', taxGroup)
+
     console.log("prodRows recipeReqCreator", prodRows);
+    console.log("pays recipeReqCreator", [
+            {
+              type: 2, 
+              sum: parseFloat(transactionData.params.amount),
+              comment: "Коментар на рядок оплати", 
+              paysys: transactionData.params.paymentSystem,
+              rrn: transactionData.params.rrn, 
+              cardmask: transactionData.params.pan, 
+              term_id: transactionData.params.terminalId, 
+              bank_id: transactionData.params.bankAcquirer, 
+              auth_code: transactionData.params.approvalCode, 
+            },
+          ],)
     return {
       dt: dt,
       tag: "",

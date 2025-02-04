@@ -31,7 +31,6 @@ const checkIfProductCategory = async (req, res, next) => {
       }
     }
 
-    // Attach the arrays to req for use in the controller
     req.validProducts = validProducts;
     req.invalidProducts = invalidProducts;
 

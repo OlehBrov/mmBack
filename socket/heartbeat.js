@@ -19,7 +19,7 @@ const forPing = {
 wsServer.removeAllListeners("connect");
 wsServer.on("connection", (socket) => {
   const { sendHandshake } = require("../client");
-  // Send initial terminal status to the newly connected client
+
   // socket.emit("terminal-status", { status: terminalStatus || "offline" });
   socket.on("check-status", () => {
     console.log("Received 'check-status' from client");
@@ -28,12 +28,12 @@ wsServer.on("connection", (socket) => {
 
   socket.on("idle-status", async (status) => {
     if (status.isIdleOpen) {
-      // If idle is false, stop checking and save the data
+     
       if (!isSaving) {
-        isSaving = true; // Prevent duplicate saves
+        isSaving = true;
 
-        await saveTempProductDataToDB(); // Save data
-        isSaving = false; // Reset saving status
+        await saveTempProductDataToDB(); 
+        isSaving = false; 
       }
     }
   });
@@ -53,7 +53,7 @@ wsServer.on("connection", (socket) => {
 });
 
 const checkIdleFrontStatus = () => {
-  if (isSaving) return; // If data is being saved, skip checks
+  if (isSaving) return; 
 
   wsServer.emit("screen-status", () =>
     console.log("wsServer.emit screen-status")

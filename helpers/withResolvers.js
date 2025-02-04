@@ -1,4 +1,3 @@
-// Utility function to create promise with external resolvers
 const withResolvers = () => {
   let resolve, reject, cancel;
   const promise = new Promise((res, rej) => {

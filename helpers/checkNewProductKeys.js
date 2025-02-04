@@ -13,7 +13,6 @@ const checkNewProductKeys = async (product, possibleUpdateKeys) => {
      ...product,
     data: updatedData,
     }
-    console.log('newProd', newProd)
   return {
     ...product,
     data: updatedData,

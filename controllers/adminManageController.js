@@ -3,7 +3,7 @@ const { json } = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
-const { AUTH_TOKEN_SECRET_KEY } = process.env;
+const { AUTH_TOKEN_SECRET_KEY, STORE_AUTH_ID } = process.env;
 // const Product = require("../models/product");
 // const Store = require("../models/store");
 const { httpError } = require("../helpers");
@@ -20,22 +20,35 @@ const requiredKeys = {
   category: "array",
 };
 const getAllProducts = async (req, res, next) => {
-  const { manager } = req;
-  const { page, limit = 10 } = req.body;
+  // const { manager } = req;
+  // const { page, limit = 10 } = req.body;
 
-  if (!manager) {
-    return next(httpError(401));
-  }
+  // if (!manager) {
+  //   return next(httpError(401));
+  // }
 
-  const skip = (page - 1) * limit;
+  // const skip = (page - 1) * limit;
   try {
     const [allProducts, productsCount] = await prisma.$transaction([
       prisma.products.findMany({
-        skip: skip,
-        take: limit,
+        // skip: skip,
+        // take: limit,
         include: {
-          ProductCategories: {
-            include: { Categories: true },
+          Categories: true,
+          Subcategories: true,
+          Sales: true,
+          LoadProducts_LoadProducts_product_idToProducts: {
+            select: { load_date: true },
+          },
+
+          ComboProducts_Products_combo_idToComboProducts: {
+            include: {
+              Products_ComboProducts_child_product_idToProducts: {
+                select: {
+                  product_left: true, // Include only the 'product_left' column for the child product
+                },
+              },
+            },
           },
         },
       }),
@@ -43,6 +56,7 @@ const getAllProducts = async (req, res, next) => {
     ]);
 
     if (allProducts && productsCount) {
+      console.log("allProducts", allProducts);
       res.status(200).json({
         data: allProducts,
         qty: productsCount,
@@ -202,76 +216,29 @@ const getAllStores = async (req, res) => {
 };
 
 const getSingleStore = async (req, res, next) => {
-  const store_id = Number(req.params.id);
-  // Use prisma.$transaction to ensure all operations are within a single transaction
-  const [store, productsOnStore, productCategories] = await prisma.$transaction(
-    [
-      // Get store data
-      prisma.stores.findUnique({
-        where: {
-          store_id: store_id,
-        },
-      }),
-
-      // Get all products on this store
-     prisma.productsOnStore.findMany({
-  where: {
-    store_id: store_id,
-  },
-  select: {
-    product_id: true, // If you need to include product_id
-    quantity: true,   // If you need to include quantity
-    discount: true,   // Add discount from the ProductsOnStore table
-    Products: {
-      select: {
-        product_name: true,  // Select product_name from Products table
-        price: true,         // Select price from Products table
-      },
+  const store = await prisma.Store.findFirst({
+    where: { auth_id: STORE_AUTH_ID },
+  });
+  const products = await prisma.Products.findMany({
+    include: {
+      Categories: true,
+      Subcategories: true,
     },
-  },
-}),
-      // Get all product categories for the products in this store
-      prisma.productCategories.findMany({
-        where: {
-          product_id: {
-            in: await prisma.productsOnStore
-              .findMany({
-                where: { store_id: store_id },
-                select: { product_id: true },
-              })
-              .then((products) => products.map((p) => p.product_id)),
-          },
-        },
-        include: {
-          Categories: true,
-        },
-      }),
-    ]
-  );
-
-  if (!productsOnStore.length) {
-    return res.status(200).json({
-      message: "No products on this store",
-    });
-  }
-  const storeWithProductsAndCategories = {
-    ...store,
-    productsOnStore: productsOnStore.map((storeProduct) => ({
-      product_id: storeProduct.product_id,
-      quantity: storeProduct.quantity,
-      product_price: storeProduct.Products.price,
-      discount: storeProduct.discount,
-      product_name: storeProduct.Products.product_name,
-      categories: productCategories
-        .filter((pc) => pc.product_id === storeProduct.product_id)
-        .map((pc) => ({
-          category_id: pc.category_id,
-          category_name: pc.Categories.category_name,
-        })),
-    })),
-  };
+  });
+  // console.log("store", store);
   res.status(200).json({
-    store: storeWithProductsAndCategories,
+    message: "Store found",
+    store,
+    products,
+  });
+};
+
+const getWithdraws = async (req, res, next) => {
+  console.log("getWithdraws", getWithdraws);
+  const withdrawData = await prisma.RemoveProducts.findMany({});
+  res.status(200).json({
+    message: "Store found",
+    withdrawData,
   });
 };
 
@@ -381,7 +348,9 @@ const createStore = async (req, res, next) => {
     });
     const { store_id } = newStore;
     const payload = { store_id: newStore.store_id };
-    const token = jwt.sign(payload, AUTH_TOKEN_SECRET_KEY, { expiresIn: "23h" });
+    const token = jwt.sign(payload, AUTH_TOKEN_SECRET_KEY, {
+      expiresIn: "23h",
+    });
     await prisma.Store.update({
       where: {
         store_id: store_id,
@@ -414,4 +383,5 @@ module.exports = {
   getAllProducts: ctrlWrapper(getAllProducts),
   addProducts: ctrlWrapper(addProducts),
   updateProducts: ctrlWrapper(updateProducts),
+  getWithdraws: ctrlWrapper(getWithdraws),
 };

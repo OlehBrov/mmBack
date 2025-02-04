@@ -76,8 +76,7 @@ client.on("close", (had_error) => {
 });
 
 client.on("data", (data) => {
-  console.log("client.on data accumulatedBuffer", accumulatedBuffer.length);
-  console.log("client.on data event", data.toString());
+
 
   accumulatedBuffer = Buffer.concat([accumulatedBuffer, data]);
 
@@ -85,7 +84,7 @@ client.on("data", (data) => {
   while ((endIdx = accumulatedBuffer.indexOf(0x00)) !== -1) {
     let message = accumulatedBuffer.subarray(0, endIdx); // Extract message up to delimiter
     accumulatedBuffer = accumulatedBuffer.subarray(endIdx + 1); // Remove the processed message from buffer
-    // console.log("processMessage message", message);
+   
     processMessage(message);
   }
 });
@@ -95,7 +94,7 @@ client.on("error", (err) => {
   if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") {
     terminalStatus = "offline";
     broadcastTerminalStatus();
-    reconnect(); // Start reconnection attempts
+    reconnect(); 
   }
 });
 // }
@@ -103,15 +102,15 @@ client.on("error", (err) => {
 const processMessage = (message) => {
   try {
     const response = JSON.parse(message.toString()); // Parse the buffer to string and then to JSON
-    console.log("processMessage response", response);
+   
     if (response.error) {
       eventEmitter.emit("cancelPurchase");
     } else {
-      resolvePurchase(response); // Resolve the pending promise with the response
+      resolvePurchase(response); 
     }
   } catch (e) {
     console.error("Failed to parse message:", e);
-    // Handle parsing error or take necessary actions
+    
   }
   if (accumulatedBuffer.length === 0) {
     accumulatedBuffer = Buffer.alloc(0);
@@ -129,9 +128,9 @@ function reconnect() {
      console.log("Trying to reconnect to the terminal...");
       client.connect(CLIENT_PORT, CLIENT_HOST, () => {
         console.log("Reconnected to PAX A930");
-        // Reinitialize any necessary state or resend handshake
+      
         // sendHandshake(forPing);
-        clearReconnection(); // Stop reconnection attempts
+        clearReconnection(); 
 
         sendHandshake(forPing);
         sendHandshake(forIdentify);
@@ -163,14 +162,14 @@ const sendHandshake = (msg) => {
       if (!isResolved) {
         console.log("Terminal did not respond in time");
         terminalStatus = "offline";
-        broadcastTerminalStatus(); // Notify front-end about offline status
+        broadcastTerminalStatus(); 
         isResolved = true;
         resolve({
           success: false,
           message: "Timeout: No response from terminal",
-        }); // Gracefully resolve with failure status
+        });
       }
-    }, 5000); // Timeout in 5 seconds
+    }, 5000); 
 
     client.write(messageBuffer, (err) => {
       if (err) {
@@ -183,7 +182,7 @@ const sendHandshake = (msg) => {
           resolve({
             success: false,
             message: `Error writing message: ${err.message}`,
-          }); // Gracefully resolve with error details
+          }); 
         }
       }
     });
@@ -194,12 +193,12 @@ const sendHandshake = (msg) => {
         isResolved = true;
         console.log("client.once data", data.toString());
 
-        // console.log(`${msg.method} response received:`, data.toString());
+     
         try {
           const response = data.toString();
           if (!response.error) {
             terminalStatus = "online"; // Mark terminal as online
-            broadcastTerminalStatus(); // Notify front-end about online status
+            broadcastTerminalStatus(); 
             resolve({
               success: true,
               response,
@@ -232,7 +231,7 @@ const writer = (writeData, timeout = 10000) => {
     let stringWriteData = JSON.stringify(writeData) + "\x00";
 
     const timer = setTimeout(() => {
-      client.destroy(); // Close the connection
+      client.destroy(); 
       reject(
         new Error(
           "Timeout: Data could not be written within the specified time"
@@ -243,7 +242,7 @@ const writer = (writeData, timeout = 10000) => {
     client.write(stringWriteData, (err) => {
       clearTimeout(timer);
       if (err) {
-        client.destroy(); // Close the connection
+        client.destroy(); 
         reject(new Error("Error sending purchase data: " + err.message));
       } else {
         console.log("Writer Purchase data sent", writeData);
@@ -253,19 +252,19 @@ const writer = (writeData, timeout = 10000) => {
   });
 };
 
-const paymentTimer = (payTimeout = 30) => {
-  let jsonInterruptMsg = JSON.stringify(interruptMsg);
+// const paymentTimer = (payTimeout = 30) => {
+//   let jsonInterruptMsg = JSON.stringify(interruptMsg);
 
-  jsonInterruptMsg += "\x00";
-  payTimer = setTimeout(() => {
-    client.write(jsonInterruptMsg, (err) => {
-      if (err) {
-        console.error("Error sending jsonInterruptMsg:", err);
-        client.destroy(); // Close the connection
-      } else console.log("jsonInterruptMsg sent", jsonInterruptMsg);
-    });
-  }, payTimeout * 1000);
-};
+//   jsonInterruptMsg += "\x00";
+//   payTimer = setTimeout(() => {
+//     client.write(jsonInterruptMsg, (err) => {
+//       if (err) {
+//         console.error("Error sending jsonInterruptMsg:", err);
+//         client.destroy(); // Close the connection
+//       } else console.log("jsonInterruptMsg sent", jsonInterruptMsg);
+//     });
+//   }, payTimeout * 1000);
+// };
 
 process.on("SIGINT", async () => {
   console.log("Shutting down server...");
@@ -275,7 +274,7 @@ process.on("SIGINT", async () => {
   setTimeout(() => {
     console.log("Exiting process ...");
     process.exit(0);
-  }, 3000); // Ensure all cleanup processes complete
+  }, 3000); 
 });
 
 const closeAll = async () => {
@@ -288,7 +287,7 @@ const closeAll = async () => {
       } else {
         console.log("Gracefully disconnected from PAX A930.");
       }
-      client.destroy(); // Ensure the socket is destroyed
+      client.destroy(); 
     });
   }
   setTimeout(() => {
@@ -311,7 +310,7 @@ const pingTerminal = () => {
     } catch (err) {
       console.error("Terminal is offline or not responding:", err.message);
     }
-  }, 60000); // Ping every 60 seconds
+  }, 60000); 
 };
 
 module.exports = {

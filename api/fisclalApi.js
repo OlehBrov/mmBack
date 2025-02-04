@@ -4,24 +4,38 @@ const dataPath = path.join(__dirname, "..", "data", "test.json");
 const resPath = path.join(__dirname, "..", "data", "res.json");
 const axios = require("axios");
 const { saveBuffer, initBuffer } = require("../helpers");
-const { FISCAL_HOST, AUTH_MERCH_TOKEN } = process.env;
+const { FISCAL_HOST, AUTH_MERCH_TOKEN, AUTH_MERCH_TOKEN_VAT } = process.env;
 const fd = require("../data/fiscalData.json");
-const { error } = require("console");
+
 let bufferAccess = false;
 
 const apiInstance = axios.create({
-  baseURL: `${FISCAL_HOST}/api/v3/fiscal/execute`,
-  method: "POST",
+  baseURL: `${FISCAL_HOST}`,
   timeout: 60000,
 
   headers: {
     "Content-Type": "application/json",
-    Authorization: AUTH_MERCH_TOKEN,
   },
 });
+apiInstance.interceptors.request.use(
+  (config) => {
 
+    if (config.withVat) {
+      config.headers.Authorization = AUTH_MERCH_TOKEN_VAT;
+    } else {
+      config.headers.Authorization = AUTH_MERCH_TOKEN;
+    }
+    return config;
+  },
+  (error) => {
+    // Handle errors in request setup
+    return Promise.reject(error);
+  }
+);
 const saleCheck = async (body) => {
   console.log("saleCheck runs body", body);
+
+
   bufferAccess = true;
   let buffer;
   if (!body) return { status: "Fiscal body error", error: true };
@@ -39,20 +53,33 @@ const saleCheck = async (body) => {
       };
     } else {
       try {
-        const response = await apiInstance.post("", body);
-        console.log("saleCheck response", response.data);
+        const useVat = body.withVat;
+        console.log('useVat', useVat)
+        const response = await apiInstance.post("/api/v3/fiscal/execute", body, {
+          withVat: useVat,
+        });
 
         if (response.data.res !== 0) {
           const buffer = await initBuffer();
           buffer.push(body);
           await saveBuffer(buffer);
-          console.log("response.data.res !== 0");
+
           return response.data;
         }
+        const taxCheckFiscalNumber = response.data.info.doccode;
+        console.log('taxCheckFiscalNumber', taxCheckFiscalNumber)
+        const fiscalData = await apiInstance.get(
+          `/c/${taxCheckFiscalNumber}.json`,
+          {
+            withVat: useVat,
+          }
+        );
+        console.log('fiscalData', fiscalData.data)
+
         console.log("response after if in saleCheck");
+        response.data.fiscal = fiscalData.data;
         return response.data;
       } catch (error) {
-        console.log("saleCheck error", error);
         const buffer = await initBuffer();
         buffer.push(body);
         await saveBuffer(buffer);

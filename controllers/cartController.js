@@ -7,6 +7,7 @@ const {
   preparePurchase,
   withResolvers,
   purchaseDbHandler,
+  addProductTaxGroup,
 } = require("../helpers");
 const { json } = require("express");
 
@@ -64,29 +65,27 @@ const createFakeTerminalResponce = async (purchData, key) => {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(respError);
-      }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
+      }, 10000); 
     });
   } else {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(resp);
-      }, 10000); // Adjust the delay time (e.g., 5000ms or 5 seconds) as needed
+      }, 10000);
     });
   }
 };
 
 const productsSell = async (req, res) => {
-  console.log();
+  
   if (!req.body || !req.body.cartProducts.length) {
     return res.status(400).json({
       message: "Failed to process the purchase",
       description: "No products to buy",
     });
   }
-  // console.log("req.body", req.body);
-  // const storeId = req.body.store_id;
+
   const purchaseProducts = req.body;
-  console.log("productsSell purchaseProducts", purchaseProducts);
   const store = await prisma.Store.findFirst({
     where: { auth_id: STORE_AUTH_ID },
   });
@@ -98,25 +97,32 @@ const productsSell = async (req, res) => {
     ...purchaseProducts,
     cartProducts: [],
   };
-  for (const product of purchaseProducts.cartProducts) {
-    console.log('purchaseProducts.cartProducts product', product)
-    if (product.merchant === "both") {
-      if (product.is_VAT_Excise) {
-        console.log('merchant === "both" product.is_VAT_Excise', product)
-        withVATProducts.cartProducts.push(product);
-      } else {
-        noVATProducts.cartProducts.push(product);
-      }
-    } else if (product.merchant === "VAT") {
-      withVATProducts.cartProducts.push(product);
-    } else {
-      // if (product.merchant === "noVAT")
-      noVATProducts.cartProducts.push(product);
-    }
-  }
 
-  console.log("withVATProducts", withVATProducts);
-  console.log("noVATProducts", noVATProducts);
+  addProductTaxGroup(
+    purchaseProducts.cartProducts,
+    store,
+    noVATProducts,
+    withVATProducts
+  );
+
+  // for (const product of purchaseProducts.cartProducts) {
+
+  //   console.log("purchaseProducts.cartProducts product", product);
+  //   if (product.merchant === "both") {
+  //     if (product.is_VAT_Excise) {
+  //       console.log('merchant === "both" product.is_VAT_Excise', product);
+  //       withVATProducts.cartProducts.push(product);
+  //     } else {
+  //       noVATProducts.cartProducts.push(product);
+  //     }
+  //   } else if (product.merchant === "VAT") {
+  //     withVATProducts.cartProducts.push(product);
+  //   } else {
+  //     // if (product.merchant === "noVAT")
+  //     noVATProducts.cartProducts.push(product);
+  //   }
+  // }
+
   if (
     !withVATProducts.cartProducts.length &&
     !noVATProducts.cartProducts.length
@@ -207,15 +213,13 @@ to terminal
           .status(403)
           .json({ errorDescription: responseNoVAT.errorDescription });
       }
-      fiscalData.noVAT = await recipeReqCreator(
-        noVATProducts,
-        responseNoVAT,
-        store.default_merchant_taxgrp
-      );
-      fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData.noVAT);
-      console.log("fiscalData.noVAT", fiscalData.noVAT);
+      fiscalData.noVAT = await recipeReqCreator(noVATProducts, responseNoVAT);
+      const toFiscalisationData = { ...fiscalData.noVAT, withVat: false };
+      fiscalResponse.fiscalNoVAT = await saleCheck(toFiscalisationData);
+      // fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData.noVAT);
+
       if (!responseNoVAT.error && responseNoVAT.method === "Purchase") {
-        await purchaseDbHandler(purchaseProducts, responseNoVAT);
+        await purchaseDbHandler(noVATProducts, responseNoVAT, fiscalResponse.fiscalNoVAT);
       }
     }
 
@@ -226,11 +230,8 @@ to terminal
       // await writer(purchaseWithVAT).catch(reject);
       // responseWithVAT = await transactionPromise;
       console.log("purchaseWithVAT", purchaseWithVAT);
-      responseWithVAT = await createFakeTerminalResponce(
-        purchaseWithVAT,
-        true
-      );
-      console.log("responseWithVAT", responseWithVAT);
+      responseWithVAT = await createFakeTerminalResponce(purchaseWithVAT, true);
+
       if (responseWithVAT.error) {
         console.log(
           "Error in purchaseWithVAT:",
@@ -249,25 +250,27 @@ to terminal
       }
       fiscalData.withVAT = await recipeReqCreator(
         withVATProducts,
-        responseWithVAT,
-        store.VAT_merchant_taxgrp
+        responseWithVAT
       );
-      console.log("fiscalData.withVAT", fiscalData.withVAT);
-      fiscalResponse.fiscalWithVAT = await saleCheck(fiscalData.withVAT);
 
+      const toFiscalisationData = { ...fiscalData.withVAT, withVat: true };
+      // fiscalResponse.fiscalWithVAT = await saleCheck(fiscalData.withVAT);
+
+      fiscalResponse.fiscalWithVAT = await saleCheck(toFiscalisationData);
+     
       if (!responseWithVAT.error && responseWithVAT.method === "Purchase") {
-        await purchaseDbHandler(purchaseProducts, responseWithVAT);
+        await purchaseDbHandler(withVATProducts, responseWithVAT, fiscalResponse.fiscalWithVAT);
       }
     }
 
-    //fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData);
+   
     console.log("fiscalResponse", fiscalResponse);
     res.status(200).send({
       status: "success",
       fiscalResponse,
     });
   } catch (error) {
-    // Handle promise rejection due to cancellation or other errors
+  
     if (
       error.error &&
       error.errorDescription === "Purchase cancelled by user"
@@ -280,12 +283,12 @@ to terminal
 };
 
 const cancelSell = async (req, res) => {
-  cancelRequested = true; // Set cancellation flag
+  cancelRequested = true; 
   const response = await new Promise((resolve, reject) => {
     setupPurchaseHandlers(resolve, reject);
     writer(interruptMsg).catch(reject);
   }).catch((error) => {
-    console.log("Promise was rejected due to:", error.message);
+    console.error("Promise was rejected due to:", error.message);
     res
       .status(500)
       .json({ message: "Cancellation failed", description: error.message });

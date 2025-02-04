@@ -29,7 +29,7 @@ const updateProductLoadLots = (withdrawProduct, loadLots) => {
         lot.lotIsActive = 0; // Deactivate lot if all products are decremented
       }
 
-      // Only add the modified lot to the result
+
       modifiedLots.push({
         ...lot,
         originalProductsLeft,

@@ -1,5 +1,4 @@
 const ctrlWrapper = require("./ctrlWrapper");
-const terimalResponseError = require("./terminalResponseError");
 const recipeReqCreator = require("./recipeReqCreator");
 const httpError = require("./httpError");
 const preparePurchase = require("./preparePurchase");
@@ -14,10 +13,10 @@ const { checkNewProductKeys } = require('./checkNewProductKeys')
 const setProductImgUrl = require('./setProductImgUrl')
 const checkIfProductExist = require('./checkIfProductExist')
 const checkComboProducts = require('./checkComboProducts')
+const addProductTaxGroup = require('./addProductTaxGroup')
 
 module.exports = {
   ctrlWrapper,
-  terimalResponseError,
   recipeReqCreator,
   httpError,
   preparePurchase,
@@ -32,5 +31,6 @@ module.exports = {
   setProductImgUrl,
   checkIfProductExist,
   checkComboProducts,
+  addProductTaxGroup
   // saveTempProductData
 };

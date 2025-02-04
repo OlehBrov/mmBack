@@ -18,7 +18,7 @@ if (!fs.existsSync(imagesDir)) {
 
 const addCategory = async (req, res, next) => {
   const categoryData = req.body;
-  console.log("categoryData", categoryData);
+
   try {
     const existingCategory = await prisma.Categories.findUnique({
       where: {
@@ -88,16 +88,12 @@ const editCategory = async (req, res, next) => {
         data: rest,
       });
     }
-    console.log("category_priority", category_priority);
-    console.log(
-      "existingCategory.category_priority",
-      existingCategory.category_priority
-    );
+   
     if (
       category_priority &&
       category_priority !== existingCategory.category_priority
     ) {
-      console.log("inside if");
+     ;
       await prisma.$transaction(async (tx) => {
         const existingPriorityCategory = await tx.Categories.findUnique({
           where: {
@@ -108,10 +104,7 @@ const editCategory = async (req, res, next) => {
         const neededCategory = existingPriorityCategory.category_priority; //9
         const oldPriority = existingCategory.category_priority; //10
         const existingPriorityCategoryId = existingPriorityCategory.cat_1C_id;
-        console.log("existingPriorityCategory", existingPriorityCategory);
-        console.log("neededCategory", neededCategory);
-        console.log("oldPriority", oldPriority);
-        console.log("existingPriorityCategoryId", existingPriorityCategoryId);
+       
 
         await tx.Categories.update({
           where: {
@@ -153,7 +146,7 @@ const addCategoryImage = async (req, res, next) => {
     const imageData = req.body; // Expecting an array of objects
     const imagesUrls = [];
 
-    // const { categoryImage, fileName } = imageData;
+    
     for (const imageDataItem of imageData) {
       const { categoryImage, fileName, categoryId } = imageDataItem;
       if (!categoryImage || !fileName || !categoryId) {
@@ -197,7 +190,7 @@ const addCategoryImage = async (req, res, next) => {
       message: "File uploaded successfully",
       imageUrl: imagesUrls,
     });
-    // res.status(200).json({ message: "Images uploaded successfully!" });
+
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message });
@@ -205,16 +198,16 @@ const addCategoryImage = async (req, res, next) => {
 };
 const addSubCategory = async (req, res, next) => {
   const subcategoryData = req.body;
-  console.log("subcategoryData", subcategoryData);
+ 
   try {
     const existingCategory = await prisma.Categories.findUnique({
       where: {
         cat_1C_id: subcategoryData.cat_1C_id,
       },
     });
-    console.log("existingCategory", existingCategory);
+   
     if (!existingCategory) {
-      console.log("!existingCategory");
+      
       return res.status(400).json({
         message: `Parent category with ID ${subcategoryData.cat_1C_id} not exists`,
       });
@@ -229,7 +222,7 @@ const addSubCategory = async (req, res, next) => {
         Categories_Subcategories_category_ref_1CToCategories: {
           connect: {
             cat_1C_id: existingCategory.cat_1C_id,
-          }, // Connect to the existing category by its ID
+          }, 
         },
         Categories: {
           connect: {
@@ -238,7 +231,7 @@ const addSubCategory = async (req, res, next) => {
         },
       },
     });
-    console.log("addedSubCategory", addedSubCategory);
+   
     res.status(200).json({
       message: "SubCategory added",
       addedSubCategory,
@@ -248,7 +241,7 @@ const addSubCategory = async (req, res, next) => {
     return res.status(500).json({
       message: "An error occurred while adding the subcategory",
       error: error.message,
-    }); // Send error response
+    }); 
   }
 };
 
@@ -261,13 +254,9 @@ const addStoreSale = async (req, res, next) => {
     store_sale_discount,
   } = req.body;
 
-  console.log("req.body", req.body);
+  
   try {
-    console.log("store_sale_product_category", store_sale_product_category);
-    console.log(
-      "store_sale_product_subcategory",
-      store_sale_product_subcategory
-    );
+   
     const existingCategoryAndSubcategory = await prisma.Subcategories.findFirst(
       {
         where: {
@@ -286,17 +275,11 @@ const addStoreSale = async (req, res, next) => {
         },
       }
     );
-    console.log(
-      "existingCategoryAndSubcategory",
-      existingCategoryAndSubcategory
-    );
+    
     if (!existingCategoryAndSubcategory) {
       next(httpError(404, "Product category or subcategory not found"));
     }
-    console.log(
-      "existingCategoryAndSubcategory",
-      existingCategoryAndSubcategory
-    );
+    
     const [updatedStore, updatedSales, updatedProducts] =
       await prisma.$transaction([
         prisma.Store.update({
@@ -360,7 +343,7 @@ const getStoreSale = async (req, res, next) => {
         auth_id: STORE_AUTH_ID,
       },
     });
-    console.log("store", store);
+    
     if (
       !store.store_sale_product_category ||
       !store.store_sale_product_subcategory
@@ -423,7 +406,7 @@ const getStoreSale = async (req, res, next) => {
         },
       }),
     ]);
-    console.log("With default sale");
+    
     res.status(200).json({
       message: "With default sale",
       // products: [],
@@ -455,6 +438,9 @@ const getMerchantData = async (req, res) => {
       vatExciseMerchant: store.VAT_excise_merchant,
       useVATbyDefault: store.use_VAT_by_default,
       isSingleMerchant: store.is_single_merchant,
+      noVATTaxGroup: store.default_merchant_taxgrp,
+      VATTaxGroup: store.VAT_merchant_taxgrp,
+      VATExciseTaxGroup: store.VAT_excise_taxgrp
     });
   } catch (error) {
     httpError(500, "Error in getMerchantData");
