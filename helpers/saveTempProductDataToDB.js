@@ -19,7 +19,7 @@ const saveTempProductDataToDB = async () => {
     const tempFileData = JSON.parse(
       await fs.readFile(productsTempUpdatesPath, "utf-8")
     );
-    console.log('tempFileData', tempFileData)
+    console.log("tempFileData", tempFileData);
     // await prisma.$transaction(async (tx) => {
     //   for (const product of tempFileData) {
     //     const dateResult = new Date().toISOString(); // Use standard ISO format
@@ -107,6 +107,12 @@ const saveTempProductDataToDB = async () => {
             updatedAt: product.data?.updatedAt,
             product_left: product.data?.product_left,
             is_new_product: product.data?.is_new_product,
+            // cat_subcat_id: product.catSubcatId.id,
+            Subcategories_Products_cat_subcat_idToSubcategories: {
+              connect: {
+                id: product.catSubcatId.id,
+              },
+            },
             Categories: {
               connect: {
                 cat_1C_id: product.data.product_category,
@@ -148,6 +154,12 @@ const saveTempProductDataToDB = async () => {
             excise_product: product.data.excise_product || false,
             updatedAt: product.data.updatedAt,
             product_left: product.data.product_left || 0,
+            // cat_subcat_id: product.catSubcatId.id,
+            Subcategories_Products_cat_subcat_idToSubcategories: {
+              connect: {
+                id: product.catSubcatId.id,
+              },
+            },
             Categories: {
               connect: {
                 cat_1C_id: product.data.product_category, // Use the foreign key here

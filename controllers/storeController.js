@@ -124,7 +124,7 @@ const getAllStoreProducts = async (req, res, next) => {
         ProductsDivisions: true,
       },
     });
- 
+
     if (is_single_merchant && !use_VAT_by_default) {
       for (const product of filteredProducts) {
         if (product.sale_id === 7) {
@@ -380,6 +380,7 @@ const addProducts = async (req, res, next) => {
               excise_product: product.excise_product || false,
               product_category: product.product_category,
               product_subcategory: product.product_subcategory,
+              cat_subcat_id: product.catSubcatId.id,
               sale_id: product.sale_id || 0,
               combo_id: product.combo_id || null,
               is_new_product: product?.is_new_product || false,
@@ -412,6 +413,7 @@ const addProducts = async (req, res, next) => {
             is_VAT_Excise: product.is_VAT_Excise || false,
             excise_product: product.excise_product || false,
             is_new_product: product?.is_new_product || false,
+            cat_subcat_id: product.catSubcatId.id,
           },
         });
 
@@ -855,8 +857,7 @@ const updateProducts = async (req, res) => {
 
     const approved = [];
     const rejected = [];
-    console.log('productsToUpdate', productsToUpdate)
-    console.log("newProducts", newProducts);
+
     for (const updateData of productsToUpdate) {
       const parcedProduct = parceProduct(updateData);
 
@@ -903,13 +904,16 @@ const updateProducts = async (req, res) => {
         });
         continue;
       }
-
-      approved.push(parcedProduct);
-      console.log("approved parcedProduct", approved);
+      const productsWithCatSubcatId = {
+        ...parcedProduct,
+        catSubcatId: {
+          ...categoryAndSubcategoryExist,
+        },
+      };
+      approved.push(productsWithCatSubcatId);
+      console.log("approved parcedProduct", productsWithCatSubcatId);
     }
 
-
-    console.log("approved parcedProduct", approved);
     console.log("rejected parcedProduct", rejected);
     for (const newProductData of newProducts) {
       const parcedNewProduct = parceProduct(newProductData);
@@ -926,9 +930,27 @@ const updateProducts = async (req, res) => {
         });
         continue;
       }
+      const categoryAndSubcategoryExist = await checkExistingCategory(
+        categoryInt,
+        subcategoryInt
+      );
 
+      if (!categoryAndSubcategoryExist) {
+        rejected.push({
+          ...parcedNewProduct,
+          reason: `No such category with id ${categoryInt} and subcategory with id ${subcategoryInt} combination. 
+          Add category and / or subcategory before adding product with those category and subcategory`,
+        });
+        continue;
+      }
+      const productsWithCatSubcatId = {
+        ...parcedNewProduct,
+        catSubcatId: {
+          ...categoryAndSubcategoryExist,
+        },
+      };
       const verifiedKeysNewProduct = await checkNewProductKeys(
-        parcedNewProduct,
+        productsWithCatSubcatId,
         possibleUpdateKeys
       );
       console.log("verifiedKeysNewProduct", verifiedKeysNewProduct);
@@ -942,7 +964,6 @@ const updateProducts = async (req, res) => {
       }
 
       approved.push(verifiedKeysNewProduct);
-      console.log("verifiedKeysNewProduct", approved);
     }
 
     if (approved.length > 0) {

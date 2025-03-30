@@ -276,57 +276,310 @@ const addSubCategory = async (req, res, next) => {
     });
   }
 };
+
+const checkIfManyCategoriesExist = async (oldId, newId) => {
+  return await prisma.Categories.findMany({
+    where: {
+      cat_1C_id: {
+        in: [oldId, newId],
+      },
+    },
+  });
+};
+
+const checkIfCatAndSubcatExist = async (cat1C, subcat1C) => {
+  const existingCategory = await prisma.Categories.findUnique({
+    where: {
+      cat_1C_id: cat1C,
+    },
+  });
+  if (!existingCategory) {
+    return {
+      status: false,
+      message: "Provided category not exist",
+    };
+  }
+  const existingSubCategory = await prisma.Subcategories.findUnique({
+    where: {
+      subcat_1C_id: subcat1C,
+    },
+  });
+  if (!existingSubCategory) {
+    return {
+      status: false,
+      message: "Provided subcategory not exist",
+    };
+  } else
+    return {
+      status: true,
+      existingCategory,
+      existingSubCategory,
+    };
+};
+
+const editNewCatAndSubcat = async (updateData) => {
+  const existingCategories = await checkIfManyCategoriesExist(
+    updateData.cat_1C_id,
+    updateData.new_cat_1C_id
+  );
+
+  const hasOldCategory = existingCategories.some(
+    (cat) => cat.cat_1C_id === updateData.cat_1C_id
+  );
+  const hasNewCategory = existingCategories.some(
+    (cat) => cat.cat_1C_id === updateData.new_cat_1C_id
+  );
+  if (!hasOldCategory || !hasNewCategory) {
+    return {
+      status: false,
+      categoriesNotExist: updateData,
+      message: "Old or new category not exist",
+    };
+  }
+
+  const existingSubCategory = await prisma.Subcategories.findFirst({
+    where: {
+      AND: [
+        {
+          category_ref_1C: updateData.cat_1C_id,
+        },
+        {
+          subcat_1C_id: updateData.subcat_1C_id,
+        },
+      ],
+    },
+  });
+  if (!existingSubCategory) {
+    return {
+      status: false,
+      categoriesNotExist: updateData,
+      message: "Old subcategory not exists",
+    };
+  }
+  const isNewSubcategoryTaken = await prisma.Subcategories.findUnique({
+    where: {
+      subcat_1C_id: updateData.new_subcat_1C_id,
+    },
+  });
+  if (isNewSubcategoryTaken) {
+    return {
+      status: false,
+      categoriesNotExist: updateData,
+      message: "New subcategory ID is already in use",
+    };
+  }
+
+  const newSubcategory1C = updateData.new_subcat_1C_id;
+  const newCategory1C = updateData.new_cat_1C_id;
+  const subcatDiscount = updateData?.subcategory_discount
+    ? updateData.subcategory_discount
+    : null;
+  const subCatName = updateData?.subcategory_name.trim()
+    ? updateData?.subcategory_name.trim()
+    : existingSubCategory.subcategory_name;
+  try {
+    const newSubcategory = await prisma.Subcategories.create({
+      data: {
+        subcategory_name: subCatName,
+        subcategory_discount: subcatDiscount,
+        subcat_1C_id: newSubcategory1C,
+
+        Categories: {
+          connect: {
+            id: hasNewCategory.id, // ← use category.id, not cat_1C_id
+          },
+        },
+        Categories_Subcategories_category_ref_1CToCategories: {
+          connect: {
+            cat_1C_id: newCategory1C, // 👈 this assumes 12 is the correct cat_1C_id to match
+          },
+        },
+      },
+    });
+
+    const updatedProducts = await prisma.Products.updateMany({
+      where: {
+        cat_subcat_id: existingSubCategory.id,
+      },
+      data: {
+        cat_subcat_id: newSubcategory.id,
+        product_category: newSubcategory.category_ref_1C,
+        product_subcategory: newSubcategory.subcat_1C_id,
+      },
+    });
+
+    await prisma.Subcategories.delete({
+      where: { id: existingSubCategory.id },
+    });
+
+    return {
+      status: true,
+      updatedProductsCount: updatedProducts.count,
+      newSubcategory,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      error,
+    };
+  }
+};
+
+const editNewSubcat = async (updateData) => {
+  const resultIfCatAndSubcatExist = await checkIfCatAndSubcatExist(
+    updateData.cat_1C_id,
+    updateData.subcat_1C_id
+  );
+
+  if (!resultIfCatAndSubcatExist.status) {
+    return {
+      status: false,
+      categoriesNotExist: updateData,
+      message: resultIfCatAndSubcatExist.message,
+    };
+  }
+
+  const isNewSubcategoryTaken = await prisma.Subcategories.findUnique({
+    where: {
+      subcat_1C_id: updateData.new_subcat_1C_id,
+    },
+  });
+  if (isNewSubcategoryTaken) {
+    return {
+      status: false,
+      categoriesNotExist: updateData,
+      message: "New subcategory ID is already in use",
+    };
+  }
+
+  const currentSubcat = await prisma.Subcategories.findFirst({
+    where: {
+      AND: [
+        {
+          category_ref_1C: updateData.cat_1C_id,
+        },
+        {
+          subcat_1C_id: updateData.subcat_1C_id,
+        },
+      ],
+    },
+  });
+  const newSubcategory1C = updateData.new_subcat_1C_id;
+  const prevCategory1C = updateData.cat_1C_id;
+  const subcatDiscount = updateData?.subcategory_discount
+    ? updateData.subcategory_discount
+    : null;
+
+  const subCatName = updateData?.subcategory_name.trim()
+    ? updateData?.subcategory_name.trim()
+    : currentSubcat.subcategory_name;
+  try {
+    const newSubcategory = await prisma.Subcategories.create({
+      data: {
+        subcategory_name: subCatName,
+        subcategory_discount: subcatDiscount,
+        subcat_1C_id: newSubcategory1C,
+
+        Categories: {
+          connect: {
+            id: resultIfCatAndSubcatExist.existingCategory.id, // ← use category.id, not cat_1C_id
+          },
+        },
+        Categories_Subcategories_category_ref_1CToCategories: {
+          connect: {
+            cat_1C_id: prevCategory1C, // 👈 this assumes 12 is the correct cat_1C_id to match
+          },
+        },
+      },
+    });
+
+    const updatedProducts = await prisma.Products.updateMany({
+      where: {
+        cat_subcat_id: currentSubcat.id,
+      },
+      data: {
+        cat_subcat_id: newSubcategory.id,
+        product_category: newSubcategory.category_ref_1C,
+        product_subcategory: newSubcategory.subcat_1C_id,
+      },
+    });
+
+    await prisma.Subcategories.delete({
+      where: { id: currentSubcat.id },
+    });
+    return {
+      status: true,
+      updatedProductsCount: updatedProducts.count,
+      newSubcategory,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      error,
+    };
+  }
+};
 const editSubCategory = async (req, res, next) => {
   const subcategoryData = req.body;
-  const categoriesNotExist = [];
-  const notExistingSubcategories = [];
-  const editedSubCategories = [];
+  let categoriesNotExist = [];
+  let newCategoryError = [];
+  let notExistingSubcategories = [];
+  let editedSubCategories = [];
 
+  let subcatNameError = [];
   try {
     for (const subcategoryUpdate of subcategoryData) {
-      const existingCategory = await prisma.Categories.findUnique({
-        where: {
-          cat_1C_id: subcategoryUpdate.cat_1C_id,
-        },
-      });
+      if (
+        subcategoryUpdate.new_subcat_1C_id &&
+        subcategoryUpdate.new_cat_1C_id
+      ) {
+        const result = await editNewCatAndSubcat(subcategoryUpdate);
+        if (result.status) {
+          editedSubCategories = [...editedSubCategories, result.newSubcategory];
+        }
+      } else if (
+        (subcategoryUpdate.new_subcat_1C_id &&
+          !subcategoryUpdate.new_cat_1C_id) ||
+        subcategoryUpdate.new_cat_1C_id === 0
+      ) {
+        const result = await editNewSubcat(subcategoryUpdate);
+        console.log("editNewSubcat result", result);
+        if (result.status && result.status !== "error") {
+          editedSubCategories = [...editedSubCategories, result.newSubcategory];
+        } else {
+          console.log("result.error", result.error);
+        }
+      } else {
+        const resultIfCatAndSubcatExist = await checkIfCatAndSubcatExist(
+          subcategoryUpdate.cat_1C_id,
+          subcategoryUpdate.subcat_1C_id
+        );
 
-      if (!existingCategory) {
-        categoriesNotExist.push(subcategoryUpdate);
-        continue;
-      }
+        if (!resultIfCatAndSubcatExist.status) {
+          categoriesNotExist = [...categoriesNotExist, subcategoryUpdate];
+          continue;
+        }
+        const subcategoryUpdateName = subcategoryUpdate.subcategory_name.trim();
 
-      const existingSubCategory = await prisma.Subcategories.findUnique({
-        where: {
-          subcat_1C_id: subcategoryUpdate.subcat_1C_id,
-        },
-      });
-      if (!existingSubCategory) {
-        notExistingSubcategories.push(existingSubCategory);
-        continue;
-      }
+        if (!subcategoryUpdateName || !subcategoryUpdateName.length < 1) {
+          subcatNameError = [...subcatNameError, subcategoryUpdate];
 
-      const editedSubCategory = await prisma.Subcategories.update({
-        where: {
-          subcat_1C_id: existingSubCategory.subcat_1C_id,
-        },
-        data: {
-          subcategory_name: subcategoryUpdate.subcategory_name,
-          subcategory_discount: subcategoryUpdate.subcategory_discount || null,
-          // subcat_1C_id: subcategoryUpdate.subcat_1C_id,
-          // category_ref_1C: existingCategory.cat_1C_id,
-          Categories_Subcategories_category_ref_1CToCategories: {
-            connect: {
-              cat_1C_id: existingCategory.cat_1C_id,
-            },
+          continue;
+        }
+        
+        const subcatDiscount = subcategoryUpdate.discount
+          ? subcategoryUpdate.discount
+          : null;
+        const updatedSubcategory = await prisma.Subcategories.update({
+          where: {
+            subcat_1C_id: subcategoryUpdate.subcat_1C_id,
           },
-          Categories: {
-            connect: {
-              id: existingCategory.id,
-            },
+          data: {
+            subcategory_name: subcategoryUpdateName,
+            subcategory_discount: subcatDiscount,
           },
-        },
-      });
-      editedSubCategories.push(editedSubCategory);
+        });
+      }
     }
 
     res.status(200).json({
@@ -334,6 +587,7 @@ const editSubCategory = async (req, res, next) => {
       editedSubCategories,
       categoriesNotExist,
       notExistingSubcategories,
+      newCategoryError,
     });
   } catch (error) {
     console.log(error);
@@ -343,6 +597,7 @@ const editSubCategory = async (req, res, next) => {
     });
   }
 };
+
 const addStoreSale = async (req, res, next) => {
   const {
     store_sale_product_category,
@@ -569,7 +824,7 @@ const getMerchantData = async (req, res) => {
       VATExciseTaxGroup: store.VAT_excise_taxgrp,
     });
   } catch (error) {
-    console.log('error', error)
+    console.log("error", error);
     httpError(500, "Error in getMerchantData");
   }
 };

@@ -8,9 +8,9 @@ const checkIfProductCategory = async (req, res, next) => {
     const validProducts = [];
     const invalidProducts = [];
 
-      for (const product of productsArray) {
-          const catId = parseInt(product.product_category)
-          const subcatId = parseInt(product.product_subcategory)
+    for (const product of productsArray) {
+      const catId = parseInt(product.product_category);
+      const subcatId = parseInt(product.product_subcategory);
       try {
         const categoryExists = await prisma.Categories.findUnique({
           where: { cat_1C_id: catId },
@@ -20,11 +20,27 @@ const checkIfProductCategory = async (req, res, next) => {
         });
 
         if (categoryExists && subcategoryExists) {
-          validProducts.push(product);
+          const catSubcatId = await prisma.Subcategories.findFirst({
+            where: {
+              AND: [
+                { subcat_1C_id: subcatId },
+                { category_ref_1C: categoryExists.cat_1C_id },
+              ],
+            },
+          });
+          if (catSubcatId) {
+            const updcatSubcatIdProduct = {
+              ...product,
+              catSubcatId,
+            };
+            console.log("updcatSubcatIdProduct", updcatSubcatIdProduct);
+            validProducts.push(updcatSubcatIdProduct);
+          } else invalidProducts.push(product);
         } else {
           invalidProducts.push(product);
         }
       } catch (error) {
+        console.log("error", error);
         return res
           .status(500)
           .json({ error: "Error checking product categories", details: error });
