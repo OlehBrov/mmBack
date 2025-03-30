@@ -1,6 +1,7 @@
 const updateProductLoadLots = (withdrawProduct, loadLots) => {
-
-
+  if (withdrawProduct.decrement === "inventarization") {
+    return clearAllLots(loadLots);
+  }
   if (withdrawProduct.decrement === "all" && withdrawProduct.limit === "") {
     return clearAllLots(loadLots);
   }
@@ -28,7 +29,6 @@ const updateProductLoadLots = (withdrawProduct, loadLots) => {
       if (lot.products_left === 0) {
         lot.lotIsActive = 0; // Deactivate lot if all products are decremented
       }
-
 
       modifiedLots.push({
         ...lot,

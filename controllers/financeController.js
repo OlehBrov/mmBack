@@ -3,7 +3,7 @@ const { httpError } = require("../helpers");
 const { prisma } = require("../config/db/dbConfig");
 
 const getPaymentsByPeriod = async (req, res, next) => {
-  const { start, end, type = 1 } = req.query;
+  const { start, end, type = 1 } = req.body;
   console.log("req.query start", start);
   console.log("req.query end", end);
   console.log("req.query type", type);
@@ -32,6 +32,13 @@ const getPaymentsByPeriod = async (req, res, next) => {
         },
       ],
     },
+    include: {
+      Products: {
+        select: {
+          barcode: true,
+        },
+      },
+    },
   });
   res.status(200).json({
     message: "ok",
@@ -54,8 +61,6 @@ const getProductSales = async (req, res, next) => {
     });
     return;
   }
-
-  
 };
 
 module.exports = {

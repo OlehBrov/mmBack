@@ -32,7 +32,11 @@ apiInstance.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+
+
 const saleCheck = async (body) => {
+
   console.log("saleCheck runs body", body);
 
 
@@ -80,6 +84,7 @@ const saleCheck = async (body) => {
         response.data.fiscal = fiscalData.data;
         return response.data;
       } catch (error) {
+        console.log('fiscal responce error', error)
         const buffer = await initBuffer();
         buffer.push(body);
         await saveBuffer(buffer);
@@ -137,8 +142,12 @@ const retryFailedRequests = async () => {
     }
 
     const entry = buffer.shift();
+    console.log('entry', entry)
     try {
-      const response = await apiInstance.post("", entry);
+      const useVat = entry.withVat;
+      const response = await apiInstance.post("/api/v3/fiscal/execute", entry, {
+        withVat: useVat,
+      });
       console.log("Response received:", response.data);
       if (response.data && response.data.res !== 0) {
         console.error(
@@ -155,11 +164,17 @@ const retryFailedRequests = async () => {
       }
       await saveBuffer(buffer); // Save the modified buffer
     } catch (error) {
+      console.log("retryFailedRequests error", error);
       console.error("Retry failed, re-buffering entry:", error.message);
       buffer.unshift(entry);
       await saveBuffer(buffer);
     }
   }
+};
+ const checkUnsentRecipes = () => {
+  console.log("checkUnsentRecipes invoked");
+  if (bufferAccess) return;
+  startRetryProcess();
 };
 
 // module.exports = {
@@ -170,4 +185,4 @@ const retryFailedRequests = async () => {
 
 // saleCheck(fd);
 
-module.exports = saleCheck;
+module.exports = {saleCheck, checkUnsentRecipes};

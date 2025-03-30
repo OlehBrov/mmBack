@@ -16,9 +16,7 @@ const productNormalizer = (req, res, next) => {
         exposition_term,
         sale_id,
         product_code,
-        product_price_no_VAT,
-        VAT_value,
-        excise_value
+       
       } = product;
 
       const productCategory = parseInt(product_category);
@@ -28,18 +26,14 @@ const productNormalizer = (req, res, next) => {
       const expositionTerm = parseInt(exposition_term) || 0;
       const saleId = parseInt(sale_id);
       const productCode = product_code.toString();
-      const productPriceNoVAT = parseFloat(product_price_no_VAT);
-      const vatValue = parseFloat(VAT_value);
-      const exciseValue = parseFloat(excise_value) || 0;
+  
 
       if (
         isNaN(productCategory) ||
         isNaN(productSubcategory) ||
         isNaN(productLeft) ||
         isNaN(productPrice) ||
-        isNaN(saleId) ||
-        isNaN(productPriceNoVAT) ||
-        isNaN(vatValue)
+        isNaN(saleId)     
       ) {
 
         abNormalProducts.push(product);
@@ -53,10 +47,7 @@ const productNormalizer = (req, res, next) => {
           exposition_term: expositionTerm,
           sale_id: saleId,
           product_code: productCode,
-          product_price_no_vat: productPriceNoVAT,
-          vat_value: vatValue,
-          excise_value: exciseValue
-        });
+           });
       }
     }
     req.normalizedProducts = normalizedProducts;

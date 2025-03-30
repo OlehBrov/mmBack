@@ -99,9 +99,9 @@ const purchaseDbHandler = async (
   });
 
   // Enable in production
-  // await prisma.RemoveProducts.createMany({
-  //   data: removeProductsData,
-  // });
+  await prisma.RemoveProducts.createMany({
+    data: removeProductsData,
+  });
 
   const updateProducts = async (productsToUpdate) => {
     await prisma.$transaction(async (tx) => {
@@ -131,7 +131,7 @@ const purchaseDbHandler = async (
     });
   };
   // Enable in production
-  // await updateProducts(removeProductsData);
+  await updateProducts(removeProductsData);
 };
 
 module.exports = purchaseDbHandler;

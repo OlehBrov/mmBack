@@ -27,6 +27,7 @@ wsServer.on("connection", (socket) => {
   });
 
   socket.on("idle-status", async (status) => {
+    console.log("idle-status status", status);
     if (status.isIdleOpen) {
      
       if (!isSaving) {

@@ -8,15 +8,16 @@ const transDataPath = path.join(
   "RCtransactionData.json"
 );
 
-const recipeReqCreator = async (
+const recipeReqCreator =  (
   cartProductsObject,
   transactionData
 ) => {
   const purchase = cartProductsObject.cartProducts;
   console.log("recipeReqCreator purchase", purchase);
+  console.log('transactionData', transactionData)
   // await fs.writeFile(purPath, JSON.stringify(purchase, null, 2));
   // await fs.writeFile(transDataPath, JSON.stringify(transactionData, null, 2));
-  try {
+
     const transactionDate = transactionData.params.date
       .split(".")
       .reverse()
@@ -27,8 +28,8 @@ const recipeReqCreator = async (
       const prPerRow = prod.product_price * prod.inCartQuantity;
       const discountPerRow = prod.priceDecrement * prod.inCartQuantity;
       return {
-        code: prod.product_code , //Артикул товару
-        code1: prod.barcode , // ШК товару
+        code: prod.product_code, //Артикул товару
+        code1: prod.barcode, // ШК товару
         code_a: prod.mark || "0", //Код акцизної марки товару
         name: prod.product_name,
         cnt: prod.inCartQuantity, //Кількість товару (не більше 3х знаків після коми)
@@ -39,20 +40,6 @@ const recipeReqCreator = async (
       };
     });
 
-    console.log("prodRows recipeReqCreator", prodRows);
-    console.log("pays recipeReqCreator", [
-            {
-              type: 2, 
-              sum: parseFloat(transactionData.params.amount),
-              comment: "Коментар на рядок оплати", 
-              paysys: transactionData.params.paymentSystem,
-              rrn: transactionData.params.rrn, 
-              cardmask: transactionData.params.pan, 
-              term_id: transactionData.params.terminalId, 
-              bank_id: transactionData.params.bankAcquirer, 
-              auth_code: transactionData.params.approvalCode, 
-            },
-          ],)
     return {
       dt: dt,
       tag: "",
@@ -81,10 +68,7 @@ const recipeReqCreator = async (
         },
       },
     };
-  } catch (error) {
-    console.log("error in recipeReqCreator", error);
-    return null;
-  }
+
 };
 
 module.exports = recipeReqCreator;

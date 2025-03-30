@@ -9,27 +9,33 @@ const { wsServer } = require("../socket/heartbeat");
 const { error } = require("console");
 const { date, when } = require("joi");
 const { connect } = require("http2");
+const { IMAGE_EXTENSIONS } = require("../constant/constants");
+const { sendGetMerchants } = require("../client");
 const { STORE_AUTH_ID } = process.env;
 const { MM_HOST } = process.env;
-const imagesDir = process.env.IMAGE_DIR;
+const imagesDir = process.env.CATEGORY_IMAGE_DIR;
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
 
 const addCategory = async (req, res, next) => {
   const categoryData = req.body;
-
-  try {
+  const existingCategories = [];
+  const addedCategories = [];
+  for (category of categoryData) {
+    console.log("category", category);
     const existingCategory = await prisma.Categories.findUnique({
       where: {
-        cat_1C_id: categoryData.cat_1C_id,
+        cat_1C_id: category.cat_1C_id,
       },
     });
-
+    console.log("existingCategory", existingCategory);
     if (existingCategory) {
-      res.status(400).json({
-        message: `Category with ID ${categoryData.cat1Cid} already exists`,
-      });
+      // res.status(400).json({
+      //   message: `Category with ID ${category1C} already exists`,
+      // });
+      existingCategories.push(existingCategory);
+      continue;
     }
     const maxPriorityValue = await prisma.Categories.aggregate({
       _max: {
@@ -40,46 +46,46 @@ const addCategory = async (req, res, next) => {
 
     const addedCategory = await prisma.Categories.create({
       data: {
-        category_name: categoryData.category_name,
-        category_discount: categoryData.category_discount || null,
-        category_image: categoryData.category_image || "",
-        cat_1C_id: categoryData.cat_1C_id,
+        category_name: category.category_name,
+        category_discount: category.category_discount || null,
+        category_image: category.category_image || "",
+        cat_1C_id: category.cat_1C_id,
         category_priority: defaultPriority,
       },
     });
 
-    res.status(200).json({
-      message: "Category added",
-      addedCategory,
-    });
-  } catch (error) {
-    httpError(500, "Error in addCategory");
+    addedCategories.push(addedCategory);
   }
+
+  res.status(200).json({
+    message: `${addedCategories.length} categories added, found ${existingCategories.length} already existing categories`,
+    addedCategories,
+    existingCategories,
+  });
 };
 
 const editCategory = async (req, res, next) => {
   const categoryEditData = req.body;
+  const errorCategory = [];
+  for (const updateData of categoryEditData) {
+    if (!updateData.cat_1C_id || updateData.cat_1C_id === 0) {
+      errorCategory.push(updateData);
+      continue;
+    }
 
-  if (!categoryEditData.cat_1C_id || categoryEditData.cat_1C_id === 0) {
-    res.status(400).json({
-      error: "Provide cat_1C_id value",
-    });
-  }
-
-  try {
     const existingCategory = await prisma.Categories.findUnique({
       where: {
-        cat_1C_id: categoryEditData.cat_1C_id,
+        cat_1C_id: updateData.cat_1C_id,
       },
     });
 
     if (!existingCategory) {
       res.status(400).json({
-        message: `Category with ID ${categoryEditData.cat_1C_id} not exists`,
+        message: `Category with ID ${updateData.cat_1C_id} not exists`,
       });
     }
 
-    const { cat_1C_id, category_priority, ...rest } = categoryEditData;
+    const { cat_1C_id, category_priority, ...rest } = updateData;
     if (Object.keys(rest).length > 0) {
       await prisma.Categories.update({
         where: {
@@ -88,12 +94,11 @@ const editCategory = async (req, res, next) => {
         data: rest,
       });
     }
-   
+
     if (
       category_priority &&
       category_priority !== existingCategory.category_priority
     ) {
-     ;
       await prisma.$transaction(async (tx) => {
         const existingPriorityCategory = await tx.Categories.findUnique({
           where: {
@@ -104,7 +109,6 @@ const editCategory = async (req, res, next) => {
         const neededCategory = existingPriorityCategory.category_priority; //9
         const oldPriority = existingCategory.category_priority; //10
         const existingPriorityCategoryId = existingPriorityCategory.cat_1C_id;
-       
 
         await tx.Categories.update({
           where: {
@@ -134,19 +138,21 @@ const editCategory = async (req, res, next) => {
         });
       });
     }
+  }
 
-    res.status(200).json({
-      message: "Categories updated",
-    });
-  } catch (error) {}
+  const updatedCount = categoryEditData.length - errorCategory.length;
+  res.status(200).json({
+    message: `${updatedCount} categories updated`,
+    errorCategory,
+  });
 };
 
 const addCategoryImage = async (req, res, next) => {
   try {
     const imageData = req.body; // Expecting an array of objects
     const imagesUrls = [];
+    const failedExtensionFiles = [];
 
-    
     for (const imageDataItem of imageData) {
       const { categoryImage, fileName, categoryId } = imageDataItem;
       if (!categoryImage || !fileName || !categoryId) {
@@ -163,6 +169,12 @@ const addCategoryImage = async (req, res, next) => {
           message: "Bad file name, should be with extension",
         });
       }
+      const approvedExtension = IMAGE_EXTENSIONS.includes(extension);
+
+      if (!approvedExtension) {
+        failedExtensionFiles.push(imageDataItem);
+        continue;
+      }
       const categoryFileName = `category_image_${categoryId}${extension}`;
 
       const filePath = path.join(imagesDir, categoryFileName);
@@ -172,7 +184,7 @@ const addCategoryImage = async (req, res, next) => {
           cat_1C_id: categoryId,
         },
         data: {
-          category_image: `${MM_HOST}/api/product-image/${categoryFileName}`,
+          category_image: `${MM_HOST}/api/category-image/${categoryFileName}`,
         },
       });
 
@@ -185,12 +197,16 @@ const addCategoryImage = async (req, res, next) => {
     }
 
     wsServer.emit("product-updated");
-
+    let errorMsg = "";
+    if (failedExtensionFiles.length) {
+      errorMsg = "Files should be .jpg, .jpeg, .webp, .png";
+    }
     res.send({
-      message: "File uploaded successfully",
+      message: "Images managed",
       imageUrl: imagesUrls,
+      failedExtensionFiles,
+      error: errorMsg,
     });
-
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message });
@@ -198,53 +214,135 @@ const addCategoryImage = async (req, res, next) => {
 };
 const addSubCategory = async (req, res, next) => {
   const subcategoryData = req.body;
- 
-  try {
-    const existingCategory = await prisma.Categories.findUnique({
-      where: {
-        cat_1C_id: subcategoryData.cat_1C_id,
-      },
-    });
-   
-    if (!existingCategory) {
-      
-      return res.status(400).json({
-        message: `Parent category with ID ${subcategoryData.cat_1C_id} not exists`,
-      });
-    }
+  const categoriesNotExist = [];
+  const existingSubcategories = [];
+  const addedSubCategories = [];
 
-    const addedSubCategory = await prisma.Subcategories.create({
-      data: {
-        subcategory_name: subcategoryData.subcategory_name,
-        subcategory_discount: subcategoryData.subcategory_discount || null,
-        subcat_1C_id: subcategoryData.subcat_1C_id,
-        // category_ref_1C: existingCategory.cat_1C_id,
-        Categories_Subcategories_category_ref_1CToCategories: {
-          connect: {
-            cat_1C_id: existingCategory.cat_1C_id,
-          }, 
+  try {
+    for (const subcategoryUpdate of subcategoryData) {
+      const existingCategory = await prisma.Categories.findUnique({
+        where: {
+          cat_1C_id: subcategoryUpdate.cat_1C_id,
         },
-        Categories: {
-          connect: {
-            id: existingCategory.id,
+      });
+
+      if (!existingCategory) {
+        categoriesNotExist.push(subcategoryUpdate);
+        continue;
+      }
+
+      const existingSubCategory = await prisma.Subcategories.findUnique({
+        where: {
+          subcat_1C_id: subcategoryUpdate.subcat_1C_id,
+        },
+      });
+      if (existingSubCategory) {
+        existingSubcategories.push(existingSubCategory);
+        continue;
+      }
+
+      const addedSubCategory = await prisma.Subcategories.create({
+        data: {
+          subcategory_name: subcategoryUpdate.subcategory_name,
+          subcategory_discount: subcategoryUpdate.subcategory_discount || null,
+          subcat_1C_id: subcategoryUpdate.subcat_1C_id,
+          // category_ref_1C: existingCategory.cat_1C_id,
+          Categories_Subcategories_category_ref_1CToCategories: {
+            connect: {
+              cat_1C_id: existingCategory.cat_1C_id,
+            },
+          },
+          Categories: {
+            connect: {
+              id: existingCategory.id,
+            },
           },
         },
-      },
-    });
-   
+      });
+      addedSubCategories.push(addedSubCategory);
+    }
+
     res.status(200).json({
-      message: "SubCategory added",
-      addedSubCategory,
+      message: `${addedSubCategories.length} subcategories added`,
+      addedSubCategories,
+      categoriesNotExist,
+      existingSubcategories,
     });
   } catch (error) {
     console.log(error);
     return res.status(500).json({
       message: "An error occurred while adding the subcategory",
       error: error.message,
-    }); 
+    });
   }
 };
+const editSubCategory = async (req, res, next) => {
+  const subcategoryData = req.body;
+  const categoriesNotExist = [];
+  const notExistingSubcategories = [];
+  const editedSubCategories = [];
 
+  try {
+    for (const subcategoryUpdate of subcategoryData) {
+      const existingCategory = await prisma.Categories.findUnique({
+        where: {
+          cat_1C_id: subcategoryUpdate.cat_1C_id,
+        },
+      });
+
+      if (!existingCategory) {
+        categoriesNotExist.push(subcategoryUpdate);
+        continue;
+      }
+
+      const existingSubCategory = await prisma.Subcategories.findUnique({
+        where: {
+          subcat_1C_id: subcategoryUpdate.subcat_1C_id,
+        },
+      });
+      if (!existingSubCategory) {
+        notExistingSubcategories.push(existingSubCategory);
+        continue;
+      }
+
+      const editedSubCategory = await prisma.Subcategories.update({
+        where: {
+          subcat_1C_id: existingSubCategory.subcat_1C_id,
+        },
+        data: {
+          subcategory_name: subcategoryUpdate.subcategory_name,
+          subcategory_discount: subcategoryUpdate.subcategory_discount || null,
+          // subcat_1C_id: subcategoryUpdate.subcat_1C_id,
+          // category_ref_1C: existingCategory.cat_1C_id,
+          Categories_Subcategories_category_ref_1CToCategories: {
+            connect: {
+              cat_1C_id: existingCategory.cat_1C_id,
+            },
+          },
+          Categories: {
+            connect: {
+              id: existingCategory.id,
+            },
+          },
+        },
+      });
+      editedSubCategories.push(editedSubCategory);
+    }
+
+    res.status(200).json({
+      message: `${editedSubCategories.length} subcategories updated`,
+      editedSubCategories,
+      categoriesNotExist,
+      notExistingSubcategories,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "An error occurred while adding the subcategory",
+      error: error.message,
+    });
+  }
+};
 const addStoreSale = async (req, res, next) => {
   const {
     store_sale_product_category,
@@ -254,9 +352,7 @@ const addStoreSale = async (req, res, next) => {
     store_sale_discount,
   } = req.body;
 
-  
   try {
-   
     const existingCategoryAndSubcategory = await prisma.Subcategories.findFirst(
       {
         where: {
@@ -275,11 +371,11 @@ const addStoreSale = async (req, res, next) => {
         },
       }
     );
-    
+
     if (!existingCategoryAndSubcategory) {
       next(httpError(404, "Product category or subcategory not found"));
     }
-    
+
     const [updatedStore, updatedSales, updatedProducts] =
       await prisma.$transaction([
         prisma.Store.update({
@@ -343,7 +439,7 @@ const getStoreSale = async (req, res, next) => {
         auth_id: STORE_AUTH_ID,
       },
     });
-    
+
     if (
       !store.store_sale_product_category ||
       !store.store_sale_product_subcategory
@@ -406,7 +502,7 @@ const getStoreSale = async (req, res, next) => {
         },
       }),
     ]);
-    
+
     res.status(200).json({
       message: "With default sale",
       // products: [],
@@ -425,13 +521,43 @@ const getFileExtension = (string) => {
 };
 
 const getMerchantData = async (req, res) => {
+  console.log("getMerchantData invoke");
+  /*DEFAULT MERCHANTS, MUST BE UPDATED*/
+  const merchants = {
+    noVAT: "1", //default value
+    VAT: "11", //default value
+  };
+  console.log("merchants first", merchants);
   try {
-    const store = await prisma.Store.findUnique({
+    const merchantsResponse = await sendGetMerchants();
+
+    if (
+      merchantsResponse.success &&
+      merchantsResponse.response.params.msgType === "getMerchantList"
+    ) {
+      const rawMerchantsList = merchantsResponse.response.params;
+
+      for (const merchantItem of Object.entries(rawMerchantsList)) {
+        console.log("merchantItem", merchantItem);
+        if (merchantItem[1] === "То Є Iжа Оплата") {
+          merchants.noVAT = merchantItem[0];
+        }
+        if (merchantItem[1] === "БРМГРУП Оплата") {
+          merchants.VAT = merchantItem[0];
+        }
+      }
+    }
+    console.log("merchants second", merchants);
+    const store = await prisma.Store.update({
       where: {
         auth_id: STORE_AUTH_ID,
       },
+      data: {
+        default_merchant: merchants.noVAT,
+        VAT_excise_merchant: merchants.VAT,
+      },
     });
-
+    console.log("store after update", store);
     res.status(200).json({
       status: "success",
       defaultMerchant: store.default_merchant,
@@ -440,9 +566,10 @@ const getMerchantData = async (req, res) => {
       isSingleMerchant: store.is_single_merchant,
       noVATTaxGroup: store.default_merchant_taxgrp,
       VATTaxGroup: store.VAT_merchant_taxgrp,
-      VATExciseTaxGroup: store.VAT_excise_taxgrp
+      VATExciseTaxGroup: store.VAT_excise_taxgrp,
     });
   } catch (error) {
+    console.log('error', error)
     httpError(500, "Error in getMerchantData");
   }
 };
@@ -519,4 +646,5 @@ module.exports = {
   editCategory: ctrlWrapper(editCategory),
   getMerchantData: ctrlWrapper(getMerchantData),
   setMerchantData: ctrlWrapper(setMerchantData),
+  editSubCategory: ctrlWrapper(editSubCategory),
 };

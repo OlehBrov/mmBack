@@ -8,17 +8,21 @@ const addProductValidation = Joi.array().items(
     barcode: Joi.string()
       .trim()
       .required('Field "Barcode" should not be empty'),
-    product_code: Joi.string().trim().required('Field "product_code" should not be empty'),
+    product_code: Joi.string()
+      .trim()
+      .required('Field "product_code" should not be empty'),
     measure: Joi.string().trim(),
-    product_name_ru: Joi.string().trim().allow(null),
+    product_name_ru: Joi.string().trim().allow("", null),
     product_name_ua: Joi.string().trim(),
-    product_description: Joi.string().trim().allow(null),
+    product_description: Joi.string().trim().allow("", null),
     product_image: Joi.string().trim(),
     product_discount: Joi.number().allow(null),
-    exposition_term: Joi.number().min(1).required( 'Field "exposition_term" should not be empty or 0'),
-    product_left: Joi.number().min(1).required(
-      'Field "product_left" should not be empty or 0'
-    ),
+    exposition_term: Joi.number()
+      .min(1)
+      .required('Field "exposition_term" should not be empty or 0'),
+    product_left: Joi.number()
+      .min(1)
+      .required('Field "product_left" should not be empty or 0'),
     product_price: Joi.number().required(
       'Field "product_price" should not be empty'
     ),
@@ -29,16 +33,15 @@ const addProductValidation = Joi.array().items(
       'Field "product_subcategory" should not be empty'
     ),
     sale_id: Joi.number().required('Field "sale_id" should not be empty'),
-    is_VAT_Excise: Joi.bool().required('Field "is_VAT_Excise" must be true or false'),
-    product_price_no_VAT: Joi.number().required(
-      'Field "product_price_no_VAT" should not be empty'
-    ),
-    VAT_value: Joi.number().required('Field "vat_value" should not be empty'),
-    excise_value: Joi.number().required(
-      'Field "excise_value" should not be empty'
+    is_VAT_Excise: Joi.bool().required(
+      'Field "is_VAT_Excise" must be true or false'
     ),
     child_product_barcode: Joi.string().trim(),
-    excise_product: Joi.bool().required('Field "excise_product" should not be empty and only "true" or "false"')
+    excise_product: Joi.bool().required(
+      'Field "excise_product" should not be empty and only "true" or "false"'
+    ),
+    is_new_product: Joi.bool(),
+    product_division: Joi.number()
   })
 );
 
@@ -52,12 +55,12 @@ const updateProductValidation = Joi.array().items(
       .trim()
       .required('Field "Barcode" should not be empty'),
     image: Joi.string().trim().required('Field "Image" should not be empty'),
-    description: Joi.string()
-      .trim()
-      .required('Field "description" should not be empty'),
+    description: Joi.string().trim().allow("", null),
     price: Joi.number().required('Field "Price" should not be empty'),
     total: Joi.number().required('Field "Total" should not be empty'),
     category: Joi.array().min(1).required("Add at least 1 category"),
+    is_new_product: Joi.bool(),
+    product_division: Joi.number(),
   })
 );
 
@@ -129,17 +132,6 @@ const productSchema = Joi.object({
     is_VAT_Excise: Joi.boolean().required().messages({
       "boolean.base": "is_VAT_Excise must be a boolean.",
       "any.required": "is_VAT_Excise is required.",
-    }),
-    product_price_no_VAT: Joi.number().required().messages({
-      "number.base": "Product price without VAT must be a number.",
-      "any.required": "Product price without VAT is required.",
-    }),
-    VAT_value: Joi.number().required().messages({
-      "number.base": "VAT value must be a number.",
-      "any.required": "VAT value is required.",
-    }),
-    excise_value: Joi.number().allow(null).messages({
-      "number.base": "Excise value must be a number.",
     }),
     excise_product: Joi.boolean().required().messages({
       "boolean.base": "Excise product must be a boolean.",

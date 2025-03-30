@@ -18,6 +18,7 @@ router.get("/product", productsController.getProductById);
 router.get("/single", productsController.getSingleProduct);
 router.post("/add", productNormalizer, checkIfProductCategory, bodyValidator(addProductValidation), productsController.addProducts);
 router.post("/withdraw", productsController.withdrawProducts);
+router.post("/inventarization", productsController.inventarizationWithdraw)
 // router.post("/image", upload.single("productImage"), imageController.saveImage); // Multer is not used
 router.post("/image", imageController.saveImage);
 router.post("/update", productsController.updateProducts)

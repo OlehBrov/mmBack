@@ -14,11 +14,11 @@ const { json } = require("express");
 const fiscalPath = path.join(__dirname, "..", "data", "fiscalResponse.json");
 const fiscalDataPath = path.join(__dirname, "..", "data", "fiscalData.json");
 const { writer, setupPurchaseHandlers, interruptMsg } = require("../client");
-const saleCheck = require("../api/fisclalApi");
+const { saleCheck } = require("../api/fisclalApi");
 const fakePurchaseProducts = require("../data/recipeRCpurchase.json");
 const fakeBankResponse = require("../data/fakeTerminalResponse.json");
 const { STORE_AUTH_ID } = process.env;
-let cancelRequested = require("../client");
+let {responseListeners} = require("../client");
 
 const { eventEmitter } = require("../client");
 
@@ -65,7 +65,7 @@ const createFakeTerminalResponce = async (purchData, key) => {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(respError);
-      }, 10000); 
+      }, 10000);
     });
   } else {
     return new Promise((resolve) => {
@@ -76,8 +76,231 @@ const createFakeTerminalResponce = async (purchData, key) => {
   }
 };
 
+// const productsSell = async (req, res) => {
+//   if (!req.body || !req.body.cartProducts.length) {
+//     return res.status(400).json({
+//       message: "Failed to process the purchase",
+//       description: "No products to buy",
+//     });
+//   }
+//   eventEmitter.emit("sale-active");
+//   const purchaseProducts = req.body;
+//   const store = await prisma.Store.findFirst({
+//     where: { auth_id: STORE_AUTH_ID },
+//   });
+//   const withVATProducts = {
+//     ...purchaseProducts,
+//     cartProducts: [],
+//   };
+//   const noVATProducts = {
+//     ...purchaseProducts,
+//     cartProducts: [],
+//   };
+
+//   addProductTaxGroup(
+//     purchaseProducts.cartProducts,
+//     store,
+//     noVATProducts,
+//     withVATProducts
+//   );
+
+//   if (
+//     !withVATProducts.cartProducts.length &&
+//     !noVATProducts.cartProducts.length
+//   ) {
+//     return res.status(400).json({
+//       message: "Failed to process the purchase",
+//       description: "No products to buy",
+//     });
+//   }
+
+//   let purchaseNoVAT, purchaseWithVAT;
+
+//   if (noVATProducts.cartProducts.length) {
+//     purchaseNoVAT = preparePurchase(
+//       noVATProducts,
+//       store.default_merchant,
+//       "noVat"
+//     );
+//   }
+
+//   if (withVATProducts.cartProducts.length && store.VAT_excise_merchant) {
+//     purchaseWithVAT = preparePurchase(
+//       withVATProducts,
+//       store.VAT_excise_merchant,
+//       "vat"
+//     );
+//   }
+
+//   if (!purchaseNoVAT && !purchaseWithVAT) {
+//     return res.status(400).json({
+//       message: "Failed to process the purchase",
+//       description: "Invalid sum",
+//     });
+//   }
+
+//   // if (!purchase) {
+//   //   return res.status(400).json({
+//   //     message: "Failed to process the purchase",
+//   //     description: "Invalid sum",
+//   //   });
+//   // }
+//   // console.log("purchase 1", purchase);
+//   /*
+
+//  /*REAL PAYMENT
+// to terminal
+// */
+//   const {
+//     promise: transactionPromise,
+//     resolve,
+//     reject,
+//     cancel,
+//   } = withResolvers();
+//   setupPurchaseHandlers(resolve, reject);
+//   /*************************** */
+//   eventEmitter.once("cancelPurchase", () => {
+//     console.log("Cancellation success requested");
+
+//     cancel(new Error("Purchase cancelled by user"));
+//   });
+
+//   try {
+//     let responseNoVAT, responseWithVAT;
+//     if (
+//       withVATProducts.cartProducts.length &&
+//       noVATProducts.cartProducts.length
+//     ) {
+//       wsServer.emit("twoPurchases");
+//     }
+//     // const fiscalData = {
+//     //   noVAT: null,
+//     //   withVAT: null,
+//     // };
+//     const fiscalResponse = {};
+//     const matcher = (msg) =>
+//       msg.method === "Purchase" ||
+//       msg.params?.msgType === "interruptTransmitted";
+//     if (purchaseNoVAT) {
+//       /*REAL PAYMENT*/
+//       // await writer(purchaseNoVAT).catch(reject);
+//       // responseNoVAT = await transactionPromise;
+//       try {
+//         await writer(purchaseNoVAT, matcher); // this only sends data
+//         responseNoVAT = await transactionPromise; // wait for actual terminal reply
+//       } catch (err) {
+//         eventEmitter.emit("sale-closed");
+//         console.log("❌ Terminal rejected:", err);
+//         return res.status(403).json({ errorDescription: err.message });
+//       }
+
+//       /********************** */
+//       console.log("purchaseNoVAT", purchaseNoVAT);
+//       // responseNoVAT = await createFakeTerminalResponce(purchaseNoVAT, true);
+
+//       if (responseNoVAT.error) {
+//         console.log("responseNoVAT.error", responseNoVAT.error);
+//         return res
+//           .status(403)
+//           .json({ errorDescription: responseNoVAT.errorDescription });
+//       }
+//       const toFiscalisationDataNoVat = recipeReqCreator(
+//         noVATProducts,
+//         responseNoVAT
+//       );
+//       // const toFiscalisationData = { ...fiscalData.noVAT, withVat: false };
+//       toFiscalisationDataNoVat.withVat = false;
+//       fiscalResponse.fiscalNoVAT = await saleCheck(toFiscalisationDataNoVat);
+//       // fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData.noVAT);
+
+//       if (!responseNoVAT.error && responseNoVAT.method === "Purchase") {
+//         await purchaseDbHandler(
+//           noVATProducts,
+//           responseNoVAT,
+//           fiscalResponse.fiscalNoVAT
+//         );
+//       }
+//     }
+
+//     if (purchaseWithVAT) {
+//       if (purchaseNoVAT) {
+//         wsServer.emit("secondPayment");
+//       }
+//       console.log("purchaseWithVAT", purchaseWithVAT);
+
+//       /*REAL PAYMENT*/
+//       // await writer(purchaseWithVAT).catch(reject);
+//       // responseWithVAT = await transactionPromise;
+//        try {
+//          await writer(purchaseWithVAT, matcher); // this only sends data
+//          responseWithVAT = await transactionPromise; // wait for actual terminal reply
+//        } catch (err) {
+//          eventEmitter.emit("sale-closed");
+//          console.log("❌ Terminal rejected:", err);
+//          return res.status(403).json({ errorDescription: err.message });
+//        }
+//       /****************** */
+
+//       /*FAKE PAYMENT*/
+//       // responseWithVAT = await createFakeTerminalResponce(purchaseWithVAT, true);
+//       /******************* */
+//       if (responseWithVAT.error) {
+//         console.log(
+//           "Error in purchaseWithVAT:",
+//           responseWithVAT.errorDescription
+//         );
+//         return res.status(200).json({
+//           status: "part-success",
+//           fiscalResponse: {
+//             fiscalNoVAT: fiscalResponse.fiscalNoVAT,
+//           },
+//           error: {
+//             target: "withVATProducts",
+//             description: responseWithVAT.errorDescription,
+//           },
+//         });
+//       }
+//       const toFiscalisationDataWithVAT = recipeReqCreator(
+//         withVATProducts,
+//         responseWithVAT
+//       );
+//       toFiscalisationDataWithVAT.withVat = true;
+
+//       fiscalResponse.fiscalWithVAT = await saleCheck(
+//         toFiscalisationDataWithVAT
+//       );
+
+//       if (!responseWithVAT.error && responseWithVAT.method === "Purchase") {
+//         await purchaseDbHandler(
+//           withVATProducts,
+//           responseWithVAT,
+//           fiscalResponse.fiscalWithVAT
+//         );
+//       }
+//     }
+
+//     console.log("fiscalResponse", fiscalResponse);
+//     eventEmitter.emit("sale-closed");
+//     res.status(200).send({
+//       status: "success",
+//       fiscalResponse,
+//     });
+//   } catch (error) {
+//     if (
+//       error.error &&
+//       error.errorDescription === "Purchase cancelled by user"
+//     ) {
+//       eventEmitter.emit("sale-closed");
+//       return res.status(403).json({ errorDescription: error.errorDescription });
+//     }
+//     console.error("Unexpected error during purchase:", error);
+//     eventEmitter.emit("sale-closed");
+//     res
+//       .status(500)
+//       .json({ errorDescription: "Unexpected error during purchase" });
+//   }
+// };
 const productsSell = async (req, res) => {
-  
   if (!req.body || !req.body.cartProducts.length) {
     return res.status(400).json({
       message: "Failed to process the purchase",
@@ -85,18 +308,15 @@ const productsSell = async (req, res) => {
     });
   }
 
+  eventEmitter.emit("sale-active");
+
   const purchaseProducts = req.body;
   const store = await prisma.Store.findFirst({
     where: { auth_id: STORE_AUTH_ID },
   });
-  const withVATProducts = {
-    ...purchaseProducts,
-    cartProducts: [],
-  };
-  const noVATProducts = {
-    ...purchaseProducts,
-    cartProducts: [],
-  };
+
+  const withVATProducts = { ...purchaseProducts, cartProducts: [] };
+  const noVATProducts = { ...purchaseProducts, cartProducts: [] };
 
   addProductTaxGroup(
     purchaseProducts.cartProducts,
@@ -104,24 +324,6 @@ const productsSell = async (req, res) => {
     noVATProducts,
     withVATProducts
   );
-
-  // for (const product of purchaseProducts.cartProducts) {
-
-  //   console.log("purchaseProducts.cartProducts product", product);
-  //   if (product.merchant === "both") {
-  //     if (product.is_VAT_Excise) {
-  //       console.log('merchant === "both" product.is_VAT_Excise', product);
-  //       withVATProducts.cartProducts.push(product);
-  //     } else {
-  //       noVATProducts.cartProducts.push(product);
-  //     }
-  //   } else if (product.merchant === "VAT") {
-  //     withVATProducts.cartProducts.push(product);
-  //   } else {
-  //     // if (product.merchant === "noVAT")
-  //     noVATProducts.cartProducts.push(product);
-  //   }
-  // }
 
   if (
     !withVATProducts.cartProducts.length &&
@@ -158,68 +360,40 @@ const productsSell = async (req, res) => {
     });
   }
 
-  // if (!purchase) {
-  //   return res.status(400).json({
-  //     message: "Failed to process the purchase",
-  //     description: "Invalid sum",
-  //   });
-  // }
-  // console.log("purchase 1", purchase);
-  /*
-to terminal
-*/
-  // const {
-  //   promise: transactionPromise,
-  //   resolve,
-  //   reject,
-  //   cancel,
-  // } = withResolvers();
-  // setupPurchaseHandlers(resolve, reject);
+  const fiscalResponse = {};
 
-  eventEmitter.once("cancelPurchase", () => {
-    console.log("Cancellation success requested");
-    cancel({
-      error: true,
-      errorDescription: "Purchase cancelled by user",
-    });
-  });
+  // ✅ Matcher for terminal purchase/cancel
+  const matcher = (msg) =>
+    (msg.method === "Purchase" && msg.params?.trnStatus === "1") ||
+    msg.params?.msgType === "interruptTransmitted";
 
-  // const response = await createFakeTerminalResponce(purchase);
   try {
     let responseNoVAT, responseWithVAT;
-    if (
-      withVATProducts.cartProducts.length &&
-      noVATProducts.cartProducts.length
-    ) {
-      wsServer.emit("twoPurchases");
-    }
-    const fiscalData = {
-      noVAT: null,
-      withVAT: null,
-    };
-    const fiscalResponse = {
-      fiscalNoVAT: null,
-      fiscalWithVAT: null,
-    };
+
     if (purchaseNoVAT) {
-      // await writer(purchaseNoVAT).catch(reject);
-      // responseNoVAT = await transactionPromise;
-      console.log("purchaseNoVAT", purchaseNoVAT);
-      responseNoVAT = await createFakeTerminalResponce(purchaseNoVAT, true);
-
-      if (responseNoVAT.error) {
-        console.log("responseNoVAT.error", responseNoVAT.error);
-        return res
-          .status(403)
-          .json({ errorDescription: responseNoVAT.errorDescription });
+      try {
+       responseNoVAT = await writer(purchaseNoVAT, matcher);
+        
+      } catch (err) {
+        eventEmitter.emit("sale-closed");
+        console.log("❌ Terminal rejected:", err.message);
+        return res.status(403).json({ errorDescription: err.message });
       }
-      fiscalData.noVAT = await recipeReqCreator(noVATProducts, responseNoVAT);
-      const toFiscalisationData = { ...fiscalData.noVAT, withVat: false };
-      fiscalResponse.fiscalNoVAT = await saleCheck(toFiscalisationData);
-      // fiscalResponse.fiscalNoVAT = await saleCheck(fiscalData.noVAT);
 
-      if (!responseNoVAT.error && responseNoVAT.method === "Purchase") {
-        await purchaseDbHandler(noVATProducts, responseNoVAT, fiscalResponse.fiscalNoVAT);
+      const toFiscalisationDataNoVat = recipeReqCreator(
+        noVATProducts,
+        responseNoVAT
+      );
+      toFiscalisationDataNoVat.withVat = false;
+
+      fiscalResponse.fiscalNoVAT = await saleCheck(toFiscalisationDataNoVat);
+
+      if (responseNoVAT.method === "Purchase") {
+        await purchaseDbHandler(
+          noVATProducts,
+          responseNoVAT,
+          fiscalResponse.fiscalNoVAT
+        );
       }
     }
 
@@ -227,16 +401,17 @@ to terminal
       if (purchaseNoVAT) {
         wsServer.emit("secondPayment");
       }
-      // await writer(purchaseWithVAT).catch(reject);
-      // responseWithVAT = await transactionPromise;
-      console.log("purchaseWithVAT", purchaseWithVAT);
-      responseWithVAT = await createFakeTerminalResponce(purchaseWithVAT, true);
+
+      try {
+       responseWithVAT = await writer(purchaseWithVAT, matcher);
+         
+      } catch (err) {
+        eventEmitter.emit("sale-closed");
+        console.log("❌ Terminal rejected:", err.message);
+        return res.status(403).json({ errorDescription: err.message });
+      }
 
       if (responseWithVAT.error) {
-        console.log(
-          "Error in purchaseWithVAT:",
-          responseWithVAT.errorDescription
-        );
         return res.status(200).json({
           status: "part-success",
           fiscalResponse: {
@@ -248,59 +423,97 @@ to terminal
           },
         });
       }
-      fiscalData.withVAT = await recipeReqCreator(
+
+      const toFiscalisationDataWithVAT = recipeReqCreator(
         withVATProducts,
         responseWithVAT
       );
+      toFiscalisationDataWithVAT.withVat = true;
 
-      const toFiscalisationData = { ...fiscalData.withVAT, withVat: true };
-      // fiscalResponse.fiscalWithVAT = await saleCheck(fiscalData.withVAT);
+      fiscalResponse.fiscalWithVAT = await saleCheck(
+        toFiscalisationDataWithVAT
+      );
 
-      fiscalResponse.fiscalWithVAT = await saleCheck(toFiscalisationData);
-     
-      if (!responseWithVAT.error && responseWithVAT.method === "Purchase") {
-        await purchaseDbHandler(withVATProducts, responseWithVAT, fiscalResponse.fiscalWithVAT);
+      if (responseWithVAT.method === "Purchase") {
+        await purchaseDbHandler(
+          withVATProducts,
+          responseWithVAT,
+          fiscalResponse.fiscalWithVAT
+        );
       }
     }
 
-   
-    console.log("fiscalResponse", fiscalResponse);
-    res.status(200).send({
+    eventEmitter.emit("sale-closed");
+    return res.status(200).json({
       status: "success",
       fiscalResponse,
     });
   } catch (error) {
-  
-    if (
-      error.error &&
-      error.errorDescription === "Purchase cancelled by user"
-    ) {
-      return res.status(403).json({ errorDescription: error.errorDescription });
-    }
-    console.error("Unexpected error during purchase:", error);
-    res.status(500).json({ errorDescription: "An unexpected error occurred" });
+    eventEmitter.emit("sale-closed");
+    console.error("❌ Unexpected purchase error:", error);
+    return res.status(500).json({
+      errorDescription: "Unexpected error during purchase",
+    });
   }
 };
 
-const cancelSell = async (req, res) => {
-  cancelRequested = true; 
-  const response = await new Promise((resolve, reject) => {
-    setupPurchaseHandlers(resolve, reject);
-    writer(interruptMsg).catch(reject);
-  }).catch((error) => {
-    console.error("Promise was rejected due to:", error.message);
-    res
-      .status(500)
-      .json({ message: "Cancellation failed", description: error.message });
-    return;
-  });
+// const cancelSell = async (req, res) => {
+//   cancelRequested = true;
+//   const response = await new Promise((resolve, reject) => {
+//     setupPurchaseHandlers(resolve, reject);
+//     writer(interruptMsg).catch(reject);
+//   }).catch((error) => {
+//     console.error("Promise was rejected due to:", error.message);
+//     res
+//       .status(500)
+//       .json({ message: "Cancellation failed", description: error.message });
+//     return;
+//   });
 
-  if (response && !response.error) {
-    res.status(200).json({ message: "Оплата відмінена покупцем" });
-  } else {
-    res.status(400).json({
-      message: "Failed to cancel the purchase",
-      description: response ? response.errorDescription : "No response",
+//   if (response && !response.error) {
+//     res.status(200).json({ message: "Оплата відмінена покупцем" });
+//   } else {
+//     res.status(400).json({
+//       message: "Failed to cancel the purchase",
+//       description: response ? response.errorDescription : "No response",
+//     });
+//   }
+// };
+let saleInProgress = false;
+eventEmitter.on("sale-active", () => {
+  console.log("sale-active");
+  saleInProgress = true;
+});
+eventEmitter.on("sale-closed", () => {
+  console.log("sale-closed");
+  saleInProgress = false;
+});
+const cancelSell = async (req, res) => {
+  console.log("cancelSell saleInProgress", saleInProgress);
+  if (!saleInProgress){
+console.log('in if !saleInProgress', !saleInProgress)
+   return res.status(403).json({
+      message: "No active terminal connection",
+    });}
+
+  cancelRequested = true;
+
+  const matcher = (msg) =>
+    msg?.method === "ServiceMessage" && msg?.params?.msgType === "interrupt";
+
+  let response;
+
+  try {
+    await writer(interruptMsg, 10000, matcher).catch((err) => {
+      console.warn("Failed to send interruptMsg:", err.message);
+    });
+
+    return res.status(200).json({ message: "Interrupt sent to terminal" }); // pass matcher
+  } catch (error) {
+    console.error("Promise was rejected due to:", error.message);
+    return res.status(500).json({
+      message: "Cancellation failed",
+      description: error.message,
     });
   }
 };

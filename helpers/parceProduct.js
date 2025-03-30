@@ -17,7 +17,7 @@ const parceProduct = (product) => {
       }
         if (key === "product_code") {
  
-          parsedProduct.data[key] = value.replace(/\s/g, "");
+          parsedProduct.data[key] = value.toString().replace(/\s/g, "");
           continue;
       }
       const parsedValue = parseFloat(value);

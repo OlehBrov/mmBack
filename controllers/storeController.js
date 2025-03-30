@@ -21,6 +21,7 @@ const { wsServer, checkIdleFrontStatus } = require("../socket/heartbeat");
 
 const { createNewProductsSchema } = require("../validation/validation");
 const { IMAGE_EXTENSIONS } = require("../constant/constants");
+const { equal } = require("joi");
 const imagesDir = process.env.IMAGE_DIR;
 const dataPath = path.join(__dirname, "..", "data", "faker.json");
 const productsTempUpdatesPath = path.join(
@@ -32,46 +33,69 @@ const productsTempUpdatesPath = path.join(
 
 const getAllStoreProducts = async (req, res, next) => {
   const { store } = req;
-  console.log("STORE", store);
-  const { filter, subcategory } = req.query;
+  const { filter, subcategory, division = 0 } = req.query;
+  const useDivisionFilter = parseInt(division) !== 0;
+  console.log("division", division);
+  const getNewProducts = filter === "9999";
+  const categoryFilter = filter === "9999" ? 0 : parseInt(filter);
+  let useSubcategoryFilter = false;
 
+  const createSubcatArray = (array) => {
+    if (array.length === 1 && array[0] === 0) {
+      return [0];
+    } else useSubcategoryFilter = true;
+  };
 
+  // Convert subcategory to an array of integers if it's a string
+  let subcategoryFilter = [];
+  if (typeof subcategory === "string") {
+    subcategoryFilter = subcategory.split(",").map(Number);
+  } else if (Array.isArray(subcategory)) {
+    subcategoryFilter = subcategory.map(Number);
+  }
 
-  const categoryFilter = parseInt(filter);
-  const subcategoryFilter = parseInt(subcategory);
+  createSubcatArray(subcategoryFilter);
 
   try {
     const { is_single_merchant, use_VAT_by_default } = store;
     const makeBasicClause = () => {
-      if (is_single_merchant && !use_VAT_by_default) {
-        return {
-          product_left: {
-            not: null,
-            gt: 0,
-          },
-          OR: [{ excise_product: { not: true } }, { excise_product: null }],
-        };
-      }
-      return {
+      let baseClause = {
         product_left: {
           not: null,
           gt: 0,
         },
       };
+      if (getNewProducts) {
+        baseClause = {
+          ...baseClause,
+          is_new_product: true,
+        };
+      }
+      if (is_single_merchant && !use_VAT_by_default) {
+        return {
+          ...baseClause,
+          OR: [{ excise_product: { not: true } }, { excise_product: null }],
+        };
+      }
+      if (useDivisionFilter) {
+        baseClause.product_division = {
+          equals: parseInt(division),
+        };
+      }
+      return {
+        ...baseClause,
+      };
     };
     const whereClause = makeBasicClause();
 
- 
     if (categoryFilter !== 0) {
       whereClause.product_category = categoryFilter;
     }
 
-   
-    if (subcategoryFilter !== 0) {
-      whereClause.product_subcategory = subcategoryFilter;
+    if (useSubcategoryFilter) {
+      whereClause.product_subcategory = { in: subcategoryFilter };
     }
 
- 
     const filteredProducts = await prisma.Products.findMany({
       where: whereClause,
       // skip: skip,
@@ -83,7 +107,11 @@ const getAllStoreProducts = async (req, res, next) => {
         LoadProducts_LoadProducts_product_idToProducts: {
           select: { load_date: true },
         },
-
+        Subcategories_Products_cat_subcat_idToSubcategories: {
+          include: {
+            Categories_Subcategories_category_ref_1CToCategories: true,
+          },
+        },
         ComboProducts_Products_combo_idToComboProducts: {
           include: {
             Products_ComboProducts_child_product_idToProducts: {
@@ -93,20 +121,19 @@ const getAllStoreProducts = async (req, res, next) => {
             },
           },
         },
+        ProductsDivisions: true,
       },
     });
-
+ 
     if (is_single_merchant && !use_VAT_by_default) {
       for (const product of filteredProducts) {
         if (product.sale_id === 7) {
-          console.log("product", product);
           const childProduct = await prisma.products.findUnique({
             where: {
               id: product.ComboProducts_Products_combo_idToComboProducts
                 .child_product_id,
             },
           });
-          console.log("childProduct", childProduct);
           if (childProduct.excise_product) {
             product.sale_id = 0;
           }
@@ -118,49 +145,80 @@ const getAllStoreProducts = async (req, res, next) => {
       where: whereClause,
     });
 
-   
     const distinctSubcategories = await prisma.Products.findMany({
       where: whereClause,
       select: {
         product_subcategory: true,
-        Subcategories: true, 
+        Subcategories: true,
       },
-      distinct: ["product_subcategory"], 
+      distinct: ["product_subcategory"],
     });
 
     let distinctCategories = [];
 
     // Fetch distinct categories only if subcategory === 0
-    if (subcategoryFilter === 0) {
+    if (!useSubcategoryFilter) {
       distinctCategories = await prisma.Products.findMany({
         where: {
           product_left: {
             not: null,
             gt: 0,
           },
-          product_category: categoryFilter !== 0 ? categoryFilter : undefined, 
+          product_category: categoryFilter !== 0 ? categoryFilter : undefined,
         },
         select: {
           product_category: true,
-          Categories: true, 
+          Categories: true,
         },
-        distinct: ["product_category"], 
+        distinct: ["product_category"],
       });
     }
 
-    // If no products found, return a message
+    if (distinctCategories.length) {
+      distinctCategories = await Promise.all(
+        distinctCategories.map(async (category) => {
+          const divisionData = await prisma.Products.findMany({
+            where: {
+              product_category: category.product_category,
+            },
+            select: {
+              product_division: true,
+              ProductsDivisions: {
+                select: {
+                  division_custom_id: true,
+                  division_name: true,
+                },
+              },
+            },
+            distinct: ["product_division"],
+          });
+
+          return {
+            ...category,
+            divisionData,
+          };
+        })
+      );
+    }
+    console.log("filteredProducts.length", filteredProducts.length);
     if (!filteredProducts.length) {
-      return res.status(200).json({
+      // If no products found, return a message
+      return res.status(401).json({
         message: `No products found for the provided filters.`,
+        status: "none",
       });
     }
 
-
+    const newProdsIdx = filteredProducts.findIndex((el) => el.sale_id === 4);
+    let hasNewProducts = false;
+    if (newProdsIdx !== -1) hasNewProducts = true;
     return res.status(200).json({
+      status: "ok",
       products: filteredProducts,
       totalProducts: productsCount,
       subcategories: distinctSubcategories,
-      categories: categoryFilter !== 0 ? [] : distinctCategories, 
+      categories: categoryFilter !== 0 ? [] : distinctCategories,
+      hasNewProducts,
     });
   } catch (error) {
     console.error("Error fetching store products:", error);
@@ -193,10 +251,34 @@ const getProductById = async (req, res, next) => {
 };
 const getSingleProduct = async (req, res, next) => {
   const { barcode } = req.query;
-
-  const product = await prisma.Products.findUnique({
+  //  const product = await prisma.Products.findUnique({
+  //    where: {
+  //      barcode,
+  //    },
+  //  });
+  const product = await prisma.products.findFirst({
     where: {
-      barcode,
+      OR: [
+        { barcode }, // Search directly in the Products table
+        {
+          AdditionalBarcodes_Products_additional_barcodesToAdditionalBarcodes: {
+            OR: [
+              { additional_barcode_1: barcode },
+              { additional_barcode_2: barcode },
+              { additional_barcode_3: barcode },
+              { additional_barcode_4: barcode },
+              { additional_barcode_5: barcode },
+            ],
+          },
+        },
+      ],
+      product_left: {
+        not: null,
+        gt: 0,
+      },
+    },
+    include: {
+      AdditionalBarcodes_Products_additional_barcodesToAdditionalBarcodes: true, // Include additional barcodes if found
     },
   });
 
@@ -237,7 +319,6 @@ const searchProducts = async (req, res, next) => {
   res.status(200).json({
     searchResults,
   });
- 
 };
 const addProducts = async (req, res, next) => {
   const formattedDate = moment().toISOString(true);
@@ -245,7 +326,9 @@ const addProducts = async (req, res, next) => {
 
   const dateTime = moment().toISOString(true);
   const { validProducts: products, invalidProducts, abNormalProducts } = req;
-
+  console.log("validProducts", products);
+  console.log("invalidProducts", invalidProducts);
+  console.log("abNormalProducts", abNormalProducts);
   try {
     const productsWithValidCombo = await checkComboProducts(products);
 
@@ -294,14 +377,12 @@ const addProducts = async (req, res, next) => {
               product_price: product.product_price,
               // combo_id: null,
               is_VAT_Excise: product.is_VAT_Excise || false,
-              product_price_no_VAT: product.product_price_no_VAT || 0,
-              VAT_value: product.VAT_value || 0,
-              excise_value: product.excise_value || 0,
               excise_product: product.excise_product || false,
-              product_category: product.product_category, 
-              product_subcategory: product.product_subcategory, 
-              sale_id: product.sale_id || 0, 
-              combo_id: product.combo_id || null, 
+              product_category: product.product_category,
+              product_subcategory: product.product_subcategory,
+              sale_id: product.sale_id || 0,
+              combo_id: product.combo_id || null,
+              is_new_product: product?.is_new_product || false,
             },
           });
         })
@@ -329,10 +410,8 @@ const addProducts = async (req, res, next) => {
             product_price: product.product_price,
             combo_id: null,
             is_VAT_Excise: product.is_VAT_Excise || false,
-            product_price_no_VAT: product.product_price_no_VAT || 0,
-            VAT_value: product.VAT_value || 0,
-            excise_value: product.excise_value || 0,
             excise_product: product.excise_product || false,
+            is_new_product: product?.is_new_product || false,
           },
         });
 
@@ -462,10 +541,12 @@ const withdrawProducts = async (req, res, next) => {
         message: "No matching products found in the database",
       });
     }
+    console.log("existingProducts", existingProducts);
     const proceedProducts = existingProducts.map((prod) => {
       const decrementValue = products.find((p) => {
         return p.barcode === prod.barcode;
       });
+      console.log("decrementValue", decrementValue);
       return {
         ...prod,
         decrement: decrementValue.quantity,
@@ -484,7 +565,6 @@ const withdrawProducts = async (req, res, next) => {
     const productsNoQuantity = [];
     const productsWithQuantity = [];
 
-  
     for (const prod of productsToWithdraw) {
       const dbProduct = existingProducts.find(
         (p) => p.barcode === prod.barcode
@@ -497,7 +577,6 @@ const withdrawProducts = async (req, res, next) => {
     }
 
     if (!productsWithQuantity.length) {
-
       return res.status(204).json({
         message: "All provided products have zero quantity left",
       });
@@ -539,7 +618,6 @@ const withdrawProducts = async (req, res, next) => {
         );
         await Promise.all(updatePromises);
 
-   
         const removePromises = lotsUpdateData.map((lot) =>
           tx.RemoveProducts.create({
             data: {
@@ -600,6 +678,112 @@ const withdrawProducts = async (req, res, next) => {
     next(httpError(500, "An error occurred while processing products"));
   }
 };
+
+const inventarizationWithdraw = async (req, res, next) => {
+  const formattedDate = moment().toISOString(true);
+  const validDateTime = moment(formattedDate).format(
+    "YYYY-MM-DDTHH:mm:ss.SSS+00:00"
+  );
+  const availableProducts = await prisma.Products.findMany({
+    where: {
+      product_left: {
+        not: null,
+        gt: 0,
+      },
+    },
+  });
+  console.log("availableProducts[0]", availableProducts[0]);
+  await prisma.$transaction(async (tx) => {
+    const inventarizationResult = {
+      withdrawedProducts: 0,
+    };
+    for (const product of availableProducts) {
+      console.log("product", product);
+      const withdrawProductLots = await tx.LoadProducts.findMany({
+        where: {
+          product_id: product.id,
+          lotIsActive: true,
+        },
+        orderBy: {
+          load_date_time: "asc",
+        },
+      });
+
+      const lotsUpdateData = updateProductLoadLots(
+        { ...product, decrement: "inventarization" },
+        withdrawProductLots
+      );
+      if (!lotsUpdateData.length) continue;
+
+      // Update lots in batch
+      const updatePromises = lotsUpdateData.map((lot) =>
+        tx.LoadProducts.update({
+          where: { id: lot.id },
+          data: {
+            product_id: lot.product_id,
+            load_date: lot.load_date,
+            load_quantity: lot.load_quantity,
+            lotIsActive: lot.lotIsActive ? true : false,
+            products_left: lot.products_left,
+            sale_id: lot.sale_id,
+            child_product_barcode: lot.child_product_barcode,
+            load_date_time: lot.load_date_time,
+          },
+        })
+      );
+      await Promise.all(updatePromises);
+
+      const removePromises = lotsUpdateData.map((lot) =>
+        tx.RemoveProducts.create({
+          data: {
+            product_id: product.id,
+            remove_date: validDateTime,
+            remove_quantity: lot.withdrawQuantity,
+            remove_type_id: 3,
+            isActive: false,
+            load_id: lot.id || null,
+            remove_cost: product.product_price * lot.withdrawQuantity,
+          },
+        })
+      );
+      await Promise.all(removePromises);
+
+      if (product.combo_id) {
+        await tx.Products.update({
+          where: { id: product.id },
+          data: { combo_id: null },
+        });
+        await tx.ComboProducts.deleteMany({
+          where: { main_product_id: product.id },
+        });
+
+        await tx.ComboProducts.deleteMany({
+          where: { main_product_id: product.id },
+        });
+      }
+      const sumData = await tx.LoadProducts.aggregate({
+        where: { product_id: product.id, lotIsActive: true },
+        _sum: { products_left: true },
+      });
+
+      const activeLots = await tx.LoadProducts.findMany({
+        where: { product_id: product.id, lotIsActive: true },
+        orderBy: { load_date_time: "desc" },
+      });
+
+      await tx.Products.update({
+        where: { id: product.id },
+        data: {
+          product_left: sumData._sum.products_left || 0,
+          product_lot: activeLots[0]?.id || null,
+        },
+      });
+    }
+  });
+  wsServer.emit("product-updated");
+  res.status(200).json({ message: "All products removed" });
+};
+
 const updateProducts = async (req, res) => {
   const possibleUpdateKeys = [
     "barcode",
@@ -621,10 +805,9 @@ const updateProducts = async (req, res) => {
     "product_category",
     "product_subcategory",
     "is_VAT_Excise",
-    "product_price_no_VAT",
-    "VAT_value",
-    "excise_value",
     "excise_product",
+    "is_new_product",
+    "product_division",
   ];
   try {
     const productsData = req.body;
@@ -638,7 +821,6 @@ const updateProducts = async (req, res) => {
         message: "Barcode must be provided to each product",
       });
     }
-
 
     const existingProducts = await checkIfProductExist(productsData);
 
@@ -673,15 +855,28 @@ const updateProducts = async (req, res) => {
 
     const approved = [];
     const rejected = [];
-
+    console.log('productsToUpdate', productsToUpdate)
+    console.log("newProducts", newProducts);
     for (const updateData of productsToUpdate) {
       const parcedProduct = parceProduct(updateData);
+
       if (
         !Object.hasOwn(parcedProduct.data, "product_category") &&
-        !Object.hasOwn(parcedProduct.data, "product_subcategory")
+        !Object.hasOwn(parcedProduct.data, "product_subcategory") &&
+        !Object.hasOwn(parcedProduct.data, "product_division")
       ) {
         approved.push(parcedProduct);
         continue;
+      }
+
+      console.log("parcedProduct", parcedProduct);
+      const ifDevisionExist = await prisma.ProductsDivisions.findUnique({
+        where: {
+          division_custom_id: parcedProduct.data.product_division,
+        },
+      });
+      if (!ifDevisionExist) {
+        parcedProduct.data.product_division = 0;
       }
 
       const categoryInt = parcedProduct.data.product_category;
@@ -710,8 +905,12 @@ const updateProducts = async (req, res) => {
       }
 
       approved.push(parcedProduct);
+      console.log("approved parcedProduct", approved);
     }
 
+
+    console.log("approved parcedProduct", approved);
+    console.log("rejected parcedProduct", rejected);
     for (const newProductData of newProducts) {
       const parcedNewProduct = parceProduct(newProductData);
       console.log("on start newProductData parcedNewProduct", parcedNewProduct);
@@ -732,14 +931,24 @@ const updateProducts = async (req, res) => {
         parcedNewProduct,
         possibleUpdateKeys
       );
+      console.log("verifiedKeysNewProduct", verifiedKeysNewProduct);
+      const ifDevisionExist = await prisma.ProductsDivisions.findUnique({
+        where: {
+          division_custom_id: verifiedKeysNewProduct.data.product_division,
+        },
+      });
+      if (!ifDevisionExist) {
+        verifiedKeysNewProduct.data.product_division = 0;
+      }
 
       approved.push(verifiedKeysNewProduct);
+      console.log("verifiedKeysNewProduct", approved);
     }
 
     if (approved.length > 0) {
       await saveTempFileProductsData(approved);
     }
-
+    console.log("final approved", approved);
     res.status(201).json({
       message: "Approved data will be sent to db",
       approved,
@@ -778,4 +987,5 @@ module.exports = {
   withdrawProducts: ctrlWrapper(withdrawProducts),
   getSingleProduct: ctrlWrapper(getSingleProduct),
   updateProducts: ctrlWrapper(updateProducts),
+  inventarizationWithdraw: ctrlWrapper(inventarizationWithdraw),
 };

@@ -21,10 +21,9 @@ const NEW_PRODUCT_DATA_KEYS_DEFAULTS = {
 	product_category: null,
 	product_subcategory: null,
 	is_VAT_Excise: false,
-	product_price_no_VAT: null,
-	VAT_value: null,
-	excise_value: null,
 	excise_product: false,
+	product_division: 0,
+	is_new_product: false
 }
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".webp", ".png"]

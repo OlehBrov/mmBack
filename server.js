@@ -2,6 +2,7 @@ const express = require("express");
 const app = require("./app");
 
 const {httpServer} = require("./socket/heartbeat");
+const { checkUnsentRecipes } = require("./api/fisclalApi");
 
 app.use(
   express.urlencoded({
@@ -12,8 +13,10 @@ app.use(
 app.use(express.json());
 
 app.listen(6006, '0.0.0.0', () => {
-  console.log("Example app listening on port 6006!");
+  console.log("Listening on port 6006!");
+  checkUnsentRecipes();
 });
 httpServer.listen(5005, '0.0.0.0', () => {
-  console.log("Example app listening on port 5005 socket!");
+  console.log("Listening on port 5005 socket!");
 })
+

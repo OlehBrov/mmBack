@@ -13,6 +13,7 @@ const proxyRecieptRouter = require('./routes/proxyRecieptRoutes')
 const configRouter = require('./routes/configRoutes')
 const financeRouter = require('./routes/financeRouter');
 const imagesDir = process.env.IMAGE_DIR;
+const categoryImageDir = process.env.CATEGORY_IMAGE_DIR;
 const app = express();
 
 app.use(express.static("public"));
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // app.use('api/admin', adminRouter)
 
 app.use("/api/product-image", express.static(imagesDir))
+app.use("/api/category-image", express.static(categoryImageDir));
 app.use("/api/auth/store", storeAuthRouter);
 
 app.use("/api/admin/store", adminManageRouter);

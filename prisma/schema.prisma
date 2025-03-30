@@ -54,46 +54,51 @@ model LoadProducts {
 }
 
 model Products {
-  id                                                     Int              @id(map: "Products_PK") @default(autoincrement())
-  product_name                                           String?          @db.VarChar(256)
-  product_code                                           String?          @unique(map: "Products_UNIQUE_prod_code") @db.VarChar(256)
-  barcode                                                String?          @unique(map: "Products_UNIQUE") @db.VarChar(256)
-  measure                                                String?          @db.VarChar(64)
-  product_name_ru                                        String?          @db.VarChar(256)
-  product_name_ua                                        String?          @db.VarChar(256)
-  product_description                                    String?          @db.VarChar(256)
-  product_left                                           Decimal?         @db.Decimal(10, 2)
-  product_image                                          String?          @db.VarChar(255)
-  product_price                                          Decimal?         @db.Decimal(10, 2)
-  product_discount                                       Decimal?         @db.Decimal(10, 2)
-  product_rating                                         Decimal?         @db.Decimal(10, 2)
-  product_lot                                            Int?
-  exposition_term                                        Int?
-  sale_id                                                Int?
-  discount_price_1                                       Decimal?         @db.Decimal(10, 2)
-  discount_price_2                                       Decimal?         @db.Decimal(10, 2)
-  discount_price_3                                       Decimal?         @db.Decimal(10, 2)
-  updatedAt                                              DateTime?        @db.DateTime
-  combo_id                                               Int?
-  product_category                                       Int?
-  product_subcategory                                    Int?
-  is_VAT_Excise                                          Boolean?
-  product_price_no_VAT                                   Decimal?         @db.Decimal(10, 2)
-  VAT_value                                              Decimal?         @db.Decimal(10, 2)
-  excise_value                                           Decimal?         @db.Decimal(10, 2)
-  excise_product                                         Boolean?
-  taxgrp                                                 Int?
-  ComboProducts_ComboProducts_main_product_idToProducts  ComboProducts[]  @relation("ComboProducts_main_product_idToProducts")
-  ComboProducts_ComboProducts_child_product_idToProducts ComboProducts[]  @relation("ComboProducts_child_product_idToProducts")
-  Inventory                                              Inventory?
-  LoadProducts_LoadProducts_product_idToProducts         LoadProducts[]   @relation("LoadProducts_product_idToProducts")
-  Categories                                             Categories?      @relation(fields: [product_category], references: [cat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Categories_FK")
-  ComboProducts_Products_combo_idToComboProducts         ComboProducts?   @relation("Products_combo_idToComboProducts", fields: [combo_id], references: [combo_id], onUpdate: NoAction, map: "Products_ComboProducts_FK")
-  LoadProducts_Products_product_lotToLoadProducts        LoadProducts?    @relation("Products_product_lotToLoadProducts", fields: [product_lot], references: [id], onUpdate: NoAction, map: "Products_LoadProducts_FK")
-  Sales                                                  Sales?           @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Sales_FK")
-  Subcategories                                          Subcategories?   @relation(fields: [product_subcategory], references: [subcat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Subcategories_FK")
-  RemoveProducts                                         RemoveProducts[]
-  Transactions                                           Transactions[]
+  id                                                                  Int                 @id(map: "Products_PK") @default(autoincrement())
+  product_name                                                        String?             @db.VarChar(256)
+  product_code                                                        String?             @unique(map: "Products_UNIQUE_prod_code") @db.VarChar(256)
+  barcode                                                             String?             @unique(map: "Products_UNIQUE") @db.VarChar(256)
+  measure                                                             String?             @db.VarChar(64)
+  product_name_ru                                                     String?             @db.VarChar(256)
+  product_name_ua                                                     String?             @db.VarChar(256)
+  product_description                                                 String?             @db.VarChar(256)
+  product_left                                                        Decimal?            @db.Decimal(10, 2)
+  product_image                                                       String?             @db.VarChar(255)
+  product_price                                                       Decimal?            @db.Decimal(10, 2)
+  product_discount                                                    Decimal?            @db.Decimal(10, 2)
+  product_rating                                                      Decimal?            @db.Decimal(10, 2)
+  product_lot                                                         Int?
+  exposition_term                                                     Int?
+  sale_id                                                             Int?
+  discount_price_1                                                    Decimal?            @db.Decimal(10, 2)
+  discount_price_2                                                    Decimal?            @db.Decimal(10, 2)
+  discount_price_3                                                    Decimal?            @db.Decimal(10, 2)
+  updatedAt                                                           DateTime?           @db.DateTime
+  combo_id                                                            Int?
+  product_category                                                    Int?
+  product_subcategory                                                 Int?
+  is_VAT_Excise                                                       Boolean?
+  excise_product                                                      Boolean?
+  taxgrp                                                              Int?
+  product_division                                                    Int?
+  is_new_product                                                      Boolean?            @default(false, map: "DF__Products__is_new__4DD47EBD")
+  additional_barcodes                                                 Int?
+  cat_subcat_id                                                       Int?
+  AdditionalBarcodes_AdditionalBarcodes_main_barcodeToProducts        AdditionalBarcodes? @relation("AdditionalBarcodes_main_barcodeToProducts")
+  ComboProducts_ComboProducts_main_product_idToProducts               ComboProducts[]     @relation("ComboProducts_main_product_idToProducts")
+  ComboProducts_ComboProducts_child_product_idToProducts              ComboProducts[]     @relation("ComboProducts_child_product_idToProducts")
+  Inventory                                                           Inventory?
+  LoadProducts_LoadProducts_product_idToProducts                      LoadProducts[]      @relation("LoadProducts_product_idToProducts")
+  AdditionalBarcodes_Products_additional_barcodesToAdditionalBarcodes AdditionalBarcodes? @relation("Products_additional_barcodesToAdditionalBarcodes", fields: [additional_barcodes], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Products_AdditionalBarcodes_FK")
+  Subcategories_Products_cat_subcat_idToSubcategories                 Subcategories?      @relation("Products_cat_subcat_idToSubcategories", fields: [cat_subcat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Cat_Subcat_FK")
+  Categories                                                          Categories?         @relation(fields: [product_category], references: [cat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Categories_FK")
+  ComboProducts_Products_combo_idToComboProducts                      ComboProducts?      @relation("Products_combo_idToComboProducts", fields: [combo_id], references: [combo_id], onUpdate: NoAction, map: "Products_ComboProducts_FK")
+  LoadProducts_Products_product_lotToLoadProducts                     LoadProducts?       @relation("Products_product_lotToLoadProducts", fields: [product_lot], references: [id], onUpdate: NoAction, map: "Products_LoadProducts_FK")
+  ProductsDivisions                                                   ProductsDivisions?  @relation(fields: [product_division], references: [division_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_ProductsDivisions_FK")
+  Sales                                                               Sales?              @relation(fields: [sale_id], references: [sale_custom_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Sales_FK")
+  Subcategories                                                       Subcategories?      @relation(fields: [product_subcategory], references: [subcat_1C_id], onDelete: NoAction, onUpdate: NoAction, map: "Products_Subcategories_FK")
+  RemoveProducts                                                      RemoveProducts[]
+  Transactions                                                        Transactions[]
 }
 
 model RemoveProducts {
@@ -193,6 +198,7 @@ model Subcategories {
   subcategory_discount                                 Decimal?   @db.Decimal(10, 2)
   subcat_1C_id                                         Int?       @unique(map: "Subcategories_UNIQUE")
   category_ref_1C                                      Int
+  Products_Products_cat_subcat_idToSubcategories       Products[] @relation("Products_cat_subcat_idToSubcategories")
   Products                                             Products[]
   Store                                                Store[]
   Categories                                           Categories @relation(fields: [category_ref], references: [id], onUpdate: NoAction, map: "Subcategories_Categories_FK")
@@ -207,4 +213,23 @@ model Transactions {
   left_quantity   Decimal?  @db.Decimal(10, 2)
   isActiveLot     Boolean?  @default(false, map: "DF__Transacti__isAct__4EA8A765")
   Products        Products? @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Transactions_Products_FK")
+}
+
+model ProductsDivisions {
+  div_id             Int        @id(map: "ProductsDivisions_PK") @default(autoincrement())
+  division_custom_id Int        @unique(map: "ProductsDivisions_UNIQUE")
+  division_name      String?    @db.NVarChar(256)
+  Products           Products[]
+}
+
+model AdditionalBarcodes {
+  main_barcode                                              String     @unique(map: "AdditionalBarcodes_UNIQUE") @db.VarChar(256)
+  additional_barcode_1                                      String?    @db.VarChar(256)
+  additional_barcode_2                                      String?    @db.VarChar(256)
+  additional_barcode_3                                      String?    @db.VarChar(256)
+  additional_barcode_4                                      String?    @db.VarChar(256)
+  additional_barcode_5                                      String?    @db.VarChar(256)
+  id                                                        Int        @id(map: "PK__Addition__3213E83F4DCF795F") @default(autoincrement())
+  Products_AdditionalBarcodes_main_barcodeToProducts        Products   @relation("AdditionalBarcodes_main_barcodeToProducts", fields: [main_barcode], references: [barcode], onUpdate: NoAction, map: "AdditionalBarcodes_Products_FK")
+  Products_Products_additional_barcodesToAdditionalBarcodes Products[] @relation("Products_additional_barcodesToAdditionalBarcodes")
 }
