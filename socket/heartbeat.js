@@ -2,6 +2,8 @@ const { Server } = require("socket.io");
 const { createServer } = require("http");
 const { prisma } = require("../config/db/dbConfig");
 const saveTempProductDataToDB = require("../helpers/saveTempProductDataToDB");
+const processSubcategoryMove = require("../helpers/processSubcategoryMove");
+
 
 const httpServer = createServer();
 
@@ -34,6 +36,7 @@ wsServer.on("connection", (socket) => {
         isSaving = true;
 
         await saveTempProductDataToDB(); 
+        await processSubcategoryMove();
         isSaving = false; 
       }
     }
@@ -48,12 +51,13 @@ wsServer.on("connection", (socket) => {
     socket.emit("admin-pong");
     console.log('admin-pong sent')
   })
-  // socket.on("screen-status", (status) => {
-  //   console.log("on status", status);
-  // });
+  socket.on("screen-status", (status) => {
+    console.log("on status", status);
+  });
 });
 
 const checkIdleFrontStatus = () => {
+  console.log("checkIdleFrontStatus isSaving", isSaving);
   if (isSaving) return; 
 
   wsServer.emit("screen-status", () =>

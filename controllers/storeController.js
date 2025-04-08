@@ -930,6 +930,8 @@ const updateProducts = async (req, res) => {
         });
         continue;
       }
+      const categoryInt = parcedNewProduct.data.product_category;
+      const subcategoryInt = parcedNewProduct.data.product_subcategory;
       const categoryAndSubcategoryExist = await checkExistingCategory(
         categoryInt,
         subcategoryInt

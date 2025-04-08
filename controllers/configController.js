@@ -1,7 +1,7 @@
 const { json } = require("express");
 const fs = require("fs");
 const path = require("path");
-const { ctrlWrapper } = require("../helpers");
+const { ctrlWrapper, saveTempFileSubcategoryMoveData } = require("../helpers");
 const { httpError } = require("../helpers");
 const { prisma } = require("../config/db/dbConfig");
 const modeCfb = require("crypto-js/mode-cfb");
@@ -543,7 +543,6 @@ const editSubCategory = async (req, res, next) => {
         subcategoryUpdate.new_cat_1C_id === 0
       ) {
         const result = await editNewSubcat(subcategoryUpdate);
-        console.log("editNewSubcat result", result);
         if (result.status && result.status !== "error") {
           editedSubCategories = [...editedSubCategories, result.newSubcategory];
         } else {
@@ -566,7 +565,7 @@ const editSubCategory = async (req, res, next) => {
 
           continue;
         }
-        
+
         const subcatDiscount = subcategoryUpdate.discount
           ? subcategoryUpdate.discount
           : null;
@@ -891,7 +890,104 @@ const setMerchantData = async (req, res) => {
     httpError(500, "Error in setMerchantData");
   }
 };
+const moveSubCategory = async (req, res, next) => {
+  try {
+    const response = {
+      willProcess: [],
+      error: [],
+    };
+    for (const updateSubcatData of req.body) {
+      const { cat_1C_id, subcat_1C_id, new_cat_1C_id, subcat_name } =
+        updateSubcatData;
+      const existingCategory = await prisma.Categories.findFirst({
+        where: {
+          cat_1C_id: cat_1C_id,
+        },
+      });
+      if (!existingCategory) {
+        response.error.push(
+          `Category with ID ${cat_1C_id} not found`,
+          updateSubcatData
+        );
+        continue;
+      }
 
+      const existingSubcategory = await prisma.Subcategories.findFirst({
+        where: {
+          subcat_1C_id: subcat_1C_id,
+          category_ref_1C: cat_1C_id,
+        },
+      });
+
+      if (!existingSubcategory) {
+        response.error.push(
+          `Subcategory with ID ${subcat_1C_id} not found in category ${cat_1C_id}`,
+          updateSubcatData
+        );
+        continue;
+      }
+
+      const newCategory = await prisma.Categories.findFirst({
+        where: {
+          cat_1C_id: new_cat_1C_id,
+        },
+      });
+      if (!newCategory) {
+        response.error.push(
+          `New category with ID ${new_cat_1C_id} not found`,
+          updateSubcatData
+        );
+        continue;
+      }
+      response.willProcess.push(updateSubcatData);
+    }
+    await saveTempFileSubcategoryMoveData(response.willProcess);
+    res.status(200).json({
+      message: response,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const checkCategories = async (req, res, next) => {
+  const groupedSubcategories = await prisma.subcategories.findMany({
+    include: {
+      Categories_Subcategories_category_ref_1CToCategories: {
+        select: {
+          category_name: true,
+          cat_1C_id: true,
+        },
+      },
+    },
+  });
+
+  // Group by category_ref_1C
+  const result = Object.values(
+    groupedSubcategories.reduce((acc, subcat) => {
+      const catId = subcat.category_ref_1C;
+      if (!acc[catId]) {
+        acc[catId] = {
+          categoryName:
+            subcat.Categories_Subcategories_category_ref_1CToCategories
+              ?.category_name || "Unknown",
+          category_ref_1C: catId,
+          subcategories: [],
+        };
+      }
+
+      acc[catId].subcategories.push(subcat);
+      return acc;
+    }, {})
+  );
+
+ 
+  res.status(200).json({
+    message: "Categories checked",
+    categories: result,
+  });
+};
 module.exports = {
   addCategory: ctrlWrapper(addCategory),
   addStoreSale: ctrlWrapper(addStoreSale),
@@ -902,4 +998,6 @@ module.exports = {
   getMerchantData: ctrlWrapper(getMerchantData),
   setMerchantData: ctrlWrapper(setMerchantData),
   editSubCategory: ctrlWrapper(editSubCategory),
+  moveSubCategory: ctrlWrapper(moveSubCategory),
+  checkCategories: ctrlWrapper(checkCategories),
 };
